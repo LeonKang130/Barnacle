@@ -31,7 +31,7 @@ type SpherePrimitive(radius: float32) =
 
                 t1 > eps && t1 < t
 
-    override this.Intersect(ray: Ray inref, geom: LocalGeometry byref, t: float32 byref) =
+    override this.Intersect(ray: Ray inref, geom: LocalGeometry outref, t: float32 byref) =
         let eps = 1e-3f
         let f = ray.Origin
         let a = ray.Direction.LengthSquared()
@@ -77,6 +77,8 @@ type SpherePrimitive(radius: float32) =
                     true
                 else
                     false
+    
+    override this.GetAABB() = AxisAlignedBoundingBox(-this.Radius * Vector3.One, this.Radius * Vector3.One)
 
 type SphereInstance
     (sphere: SpherePrimitive, objectToWorld: Matrix4x4, material: MaterialBase option, light: LightBase option) =
