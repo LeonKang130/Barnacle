@@ -1,0 +1,7 @@
+﻿# IDE Config
+.idea/
+# .NET build output
+bin/
+obj/
+# Render output
+image.ppm

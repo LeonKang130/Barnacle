@@ -1,0 +1,28 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Base\Ray.fs" />
+    <Compile Include="Base\Sampler.fs" />
+    <Compile Include="Base\Camera.fs" />
+    <Compile Include="Base\Material.fs" />
+    <Compile Include="Base\Light.fs" />
+    <Compile Include="Base\Primitive.fs" />
+    <Compile Include="Base\Film.fs" />
+    <Compile Include="Base\LightSampler.fs" />
+    <Compile Include="Base\Integrator.fs" />
+    <Compile Include="Extensions\Primitive\Sphere.fs" />
+    <Compile Include="Extensions\Camera\Pinhole.fs" />
+    <Compile Include="Extensions\Integrator\Normal.fs" />
+    <Compile Include="Extensions\Integrator\Direct.fs" />
+    <Compile Include="Extensions\Integrator\PathTracing.fs" />
+    <Compile Include="Extensions\Material\Lambertian.fs" />
+    <Compile Include="Extensions\LightSampler\Uniform.fs" />
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+
+</Project>
