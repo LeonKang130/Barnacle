@@ -8,18 +8,18 @@ type AxisAlignedBoundingBox =
     val mutable pMin: Vector3
     val mutable pMax: Vector3
     new(pMin: Vector3, pMax: Vector3) = { pMin = pMin; pMax = pMax }
-    member this.Center = 0.5f * (this.pMin + this.pMax)
-    member this.Diagonal = this.pMax - this.pMin
+    member inline this.Center = 0.5f * (this.pMin + this.pMax)
+    member inline this.Diagonal = this.pMax - this.pMin
 
-    member this.SurfaceArea =
+    member inline this.SurfaceArea =
         2f
         * (this.Diagonal.X * this.Diagonal.Y
            + this.Diagonal.Y * this.Diagonal.Z
            + this.Diagonal.Z * this.Diagonal.X)
 
-    member this.Volume = this.Diagonal.X * this.Diagonal.Y * this.Diagonal.Z
+    member inline this.Volume = this.Diagonal.X * this.Diagonal.Y * this.Diagonal.Z
 
-    member this.Intersect(ray: Ray inref, t: float32) : bool =
+    member inline this.Intersect(ray: Ray inref, t: float32) : bool =
         let invDir = Vector3.One / ray.Direction
         let mutable tMin = 1e-3f
         let mutable tMax = t
@@ -105,7 +105,7 @@ type LocalGeometry =
 type ElementalPrimitive() =
     abstract member Intersect: Ray inref * float32 -> bool
     abstract member Intersect: Ray inref * LocalGeometry outref * float32 byref -> bool
-    abstract member GetAABB: unit -> AxisAlignedBoundingBox
+    abstract member GetBounds: unit -> AxisAlignedBoundingBox
 
 [<Struct>]
 type Interaction =
@@ -139,14 +139,18 @@ type Interaction =
 
 and [<AbstractClass>] PrimitiveInstance
     (primitive: ElementalPrimitive, objectToWorld: Matrix4x4, material: MaterialBase option, light: LightBase option) =
-    let worldToObject =
-        let mutable inv = Matrix4x4.Identity
-        Matrix4x4.Invert(objectToWorld, &inv) |> ignore
-        inv
 
     member this.Primitive = primitive
     member this.ObjectToWorld = objectToWorld
-    member this.WorldToObject = worldToObject
+    member val WorldToObject =
+        let mutable inv = Matrix4x4.Identity
+        Matrix4x4.Invert(objectToWorld, &inv) |> ignore
+        inv
+    
+    member val Bounds =
+        let bounds = primitive.GetBounds()
+        AxisAlignedBoundingBox.Transform(&bounds, objectToWorld)
+
     member this.HasMaterial = material.IsSome
     member this.Material = material.Value
     member this.HasLight = light.IsSome
@@ -167,17 +171,12 @@ and [<AbstractClass>] PrimitiveInstance
         else
             false
 
-    member this.GetAABB() =
-        let aabb = this.Primitive.GetAABB()
-        AxisAlignedBoundingBox.Transform(&aabb, this.ObjectToWorld)
-
     abstract member Sample: Vector2 -> Interaction * float32
     abstract member EvalPDF: Interaction inref -> float32
 
 [<AbstractClass>]
 type PrimitiveAggregate(instances: PrimitiveInstance[]) =
-    let mutable _instances = instances
-    member this.Instances = _instances
+    member this.Instances = instances
     abstract member Intersect: Ray inref * float32 -> bool
     abstract member Intersect: Ray inref * Interaction outref * float32 byref -> bool
 
@@ -189,7 +188,8 @@ type ListAggregate(instances: PrimitiveInstance[]) =
         let mutable instanceId = 0
 
         while not hit && instanceId < this.Instances.Length do
-            hit <- this.Instances[instanceId].Intersect(&ray, t) || hit
+            if this.Instances[instanceId].Bounds.Intersect(&ray, t) then
+                hit <- this.Instances[instanceId].Intersect(&ray, t) || hit
             instanceId <- instanceId + 1
 
         hit
@@ -198,6 +198,7 @@ type ListAggregate(instances: PrimitiveInstance[]) =
         let mutable hit = false
 
         for instance in this.Instances do
-            hit <- instance.Intersect(&ray, &interaction, &t) || hit
+            if instance.Bounds.Intersect(&ray, t) then
+                hit <- instance.Intersect(&ray, &interaction, &t) || hit
 
         hit

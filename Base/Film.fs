@@ -19,10 +19,8 @@ type Film(resolution: int * int, toneMapping: ToneMapping) =
         match this.ToneMapping with
         | Identity -> x
         | Aces ->
-            let a, b, c, d, e = 2.51f, 0.03f, 2.43f, 0.59f, 0.14f
-
-            x * (a * x + b * Vector3.One)
-            / (x * (c * x + d * Vector3.One) + e * Vector3.One)
+            x * (2.51f * x + Vector3(0.03f))
+            / (x * (2.43f * x + Vector3(0.59f)) + Vector3(0.14f))
         | Gamma ->
             let gamma = 1f / 2.2f
             Vector3(MathF.Pow(x.X, gamma), MathF.Pow(x.Y, gamma), MathF.Pow(x.Z, gamma))

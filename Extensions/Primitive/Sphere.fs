@@ -78,7 +78,7 @@ type SpherePrimitive(radius: float32) =
                 else
                     false
     
-    override this.GetAABB() = AxisAlignedBoundingBox(-this.Radius * Vector3.One, this.Radius * Vector3.One)
+    override this.GetBounds() = AxisAlignedBoundingBox(Vector3(-this.Radius), Vector3(this.Radius))
 
 type SphereInstance
     (sphere: SpherePrimitive, objectToWorld: Matrix4x4, material: MaterialBase option, light: LightBase option) =
