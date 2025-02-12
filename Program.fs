@@ -30,7 +30,7 @@ let main _ =
         |]
         |> Array.map (fun s -> s :> PrimitiveInstance)
     let lightSampler = UniformLightSampler(spheres)
-    let integrator = DirectIntegrator(16)
+    let integrator = PathTracingIntegrator(256)
     integrator.Render(camera, film, ListAggregate(spheres), lightSampler)
     film.Save "image.ppm"
     0
