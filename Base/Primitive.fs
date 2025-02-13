@@ -138,18 +138,14 @@ type Interaction =
         this.Light.Eval(wo, this.UV)
 
 and [<AbstractClass>] PrimitiveInstance
-    (primitive: ElementalPrimitive, objectToWorld: Matrix4x4, material: MaterialBase option, light: LightBase option) =
-
+    (primitive: ElementalPrimitive, material: MaterialBase option, light: LightBase option) =
     member this.Primitive = primitive
-    member this.ObjectToWorld = objectToWorld
-    member val WorldToObject =
-        let mutable inv = Matrix4x4.Identity
-        Matrix4x4.Invert(objectToWorld, &inv) |> ignore
-        inv
+    member val ObjectToWorld = Matrix4x4.Identity with get, set
+    member val WorldToObject = Matrix4x4.Identity with get, set
     
-    member val Bounds =
+    member this.Bounds =
         let bounds = primitive.GetBounds()
-        AxisAlignedBoundingBox.Transform(&bounds, objectToWorld)
+        AxisAlignedBoundingBox.Transform(&bounds, this.ObjectToWorld)
 
     member this.HasMaterial = material.IsSome
     member this.Material = material.Value
@@ -171,6 +167,13 @@ and [<AbstractClass>] PrimitiveInstance
         else
             false
 
+    member inline this.UpdateTransform(objectToWorld: Matrix4x4) =
+        this.ObjectToWorld <- objectToWorld
+        this.WorldToObject <-
+            let mutable inv = Matrix4x4.Identity
+            Matrix4x4.Invert(objectToWorld, &inv) |> ignore
+            inv
+    
     abstract member Sample: Vector2 -> Interaction * float32
     abstract member EvalPDF: Interaction inref -> float32
 

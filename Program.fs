@@ -17,20 +17,21 @@ let main _ =
     let redMaterial = Lambertian(Vector3(0.75f, 0.25f, 0.25f)) :> MaterialBase
     let blueMaterial = Lambertian(Vector3(0.25f, 0.25f, 0.75f)) :> MaterialBase
     let whiteLight = DiffuseLight(Vector3(8f), true) :> LightBase
-    let spheres =
-        [|
-            SphereInstance(1e3f, Matrix4x4.CreateTranslation(1e3f + 1f, 40.8f, 81.6f), redMaterial)
-            SphereInstance(1e3f, Matrix4x4.CreateTranslation(-1e3f + 99f, 40.8f, 81.6f), blueMaterial)
-            SphereInstance(1e3f, Matrix4x4.CreateTranslation(50f, 40.8f, 1e3f), whiteMaterial)
-            SphereInstance(1e3f, Matrix4x4.CreateTranslation(50f, 1e3f, 81.6f), whiteMaterial)
-            SphereInstance(1e3f, Matrix4x4.CreateTranslation(50f, -1e3f + 81.6f, 81.6f), whiteMaterial)
-            SphereInstance(1e3f, Matrix4x4.CreateTranslation(50f, 40.8f, -1e3f + 181f), blackMaterial)
-            SphereInstance(16.5f, Matrix4x4.CreateTranslation(27f, 16.5f, 47f), whiteLight)
-            SphereInstance(16.5f, Matrix4x4.CreateTranslation(73f, 16.5f, 78f), whiteMaterial)
-        |]
-        |> Array.map (fun s -> s :> PrimitiveInstance)
-    let lightSampler = UniformLightSampler(spheres)
+    let mutable node = Node(Transform(), [|
+        Node(Transform(Matrix4x4.CreateTranslation(1e3f + 1f, 40.8f, 81.6f)), [| SphereInstance(1e3f, redMaterial) :> PrimitiveInstance |])
+        Node(Transform(Matrix4x4.CreateTranslation(-1e3f + 99f, 40.8f, 81.6f)), [||], [| SphereInstance(1e3f, blueMaterial) :> PrimitiveInstance |])
+        Node(Transform(Matrix4x4.CreateTranslation(50f, 40.8f, 1e3f)), [| SphereInstance(1e3f, whiteMaterial) :> PrimitiveInstance |])
+        Node(Transform(Matrix4x4.CreateTranslation(50f, 1e3f, 81.6f)), [| SphereInstance(1e3f, whiteMaterial) :> PrimitiveInstance |])
+        Node(Transform(Matrix4x4.CreateTranslation(50f, -1e3f + 81.6f, 81.6f)), [| SphereInstance(1e3f, whiteMaterial) :> PrimitiveInstance |])
+        Node(Transform(Matrix4x4.CreateTranslation(50f, 40.8f, -1e3f + 181f)), [| SphereInstance(1e3f, blackMaterial) :> PrimitiveInstance |])
+        Node(Transform(Matrix4x4.CreateScale(16.5f) * Matrix4x4.CreateTranslation(27f, 16.5f, 47f)), [| SphereInstance(1f, whiteLight) :> PrimitiveInstance |])
+        Node(Transform(Matrix4x4.CreateScale(16.5f) * Matrix4x4.CreateTranslation(73f, 16.5f, 78f)), [| SphereInstance(1f, whiteMaterial) :> PrimitiveInstance |])
+    |])
+    let mutable scene = Scene(node)
+    let instances = scene.Traverse(0f)
+    let aggregate = ListAggregate(instances)
+    let lightSampler = UniformLightSampler(instances)
     let integrator = DirectIntegrator(16)
-    integrator.Render(camera, film, ListAggregate(spheres), lightSampler)
+    integrator.Render(camera, film, aggregate, lightSampler)
     film.Save "image.ppm"
     0
