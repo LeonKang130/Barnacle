@@ -4,14 +4,14 @@ open Barnacle.Base
 
 type BVHAggregate(instances: PrimitiveInstance array) =
     inherit PrimitiveAggregate()
-    let indices, nodes =
+    let instanceIndices, bvhNodes =
         instances
         |> Array.map (_.Bounds)
         |> BVHBuilder.Default.Build
     let instances =
-        Array.init instances.Length (fun i -> instances[indices[i]])
+        Array.init instances.Length (fun i -> instances[instanceIndices[i]])
     member private this.TraverseAny(ray: Ray inref, t: float32, i: int) =
-        let node = nodes[i]
+        let node = bvhNodes[i]
         if node.Bounds.Intersect(&ray, t) then
             if node.IsLeaf then
                 let mutable hit = false
@@ -28,7 +28,7 @@ type BVHAggregate(instances: PrimitiveInstance array) =
         else
             false
     member private this.TraverseClosest(ray: Ray inref, interaction: Interaction outref, t: float32 byref, i: int) =
-        let node = nodes[i]
+        let node = bvhNodes[i]
         if node.Bounds.Intersect(&ray, t) then
             if node.IsLeaf then
                 let mutable hit = false
