@@ -19,7 +19,7 @@
     <Compile Include="Base\Scene.fs" />
     <Compile Include="Extensions\Primitive\Sphere.fs" />
     <Compile Include="Extensions\Camera\Pinhole.fs" />
-    <Compile Include="Extensions\Camera\Thinlens.fs" />
+    <Compile Include="Extensions\Camera\ThinLens.fs" />
     <Compile Include="Extensions\Integrator\Normal.fs" />
     <Compile Include="Extensions\Integrator\Direct.fs" />
     <Compile Include="Extensions\Integrator\PathTracing.fs" />
