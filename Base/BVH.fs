@@ -2,6 +2,7 @@
 namespace Barnacle.Base
 
 open System
+open System.Numerics
 open System.Runtime.InteropServices
 
 [<Struct>]
@@ -20,7 +21,7 @@ type private BVHBuildInstance =
     { bounds: AxisAlignedBoundingBox
       id: int }
 
-[<Struct; NoComparison; NoEquality; StructLayout(LayoutKind.Explicit)>]
+[<Struct; NoComparison; NoEquality; StructLayout(LayoutKind.Explicit, Size = 32)>]
 type BVHNode =
     [<DefaultValue; FieldOffset 0>]
     val mutable Bounds: AxisAlignedBoundingBox
@@ -59,9 +60,10 @@ type BVHNode =
         node.InstanceCount <- instanceCount
         node
 
-    static member inline CreateTemporary(bounds: AxisAlignedBoundingBox, splitAxis: int) =
+    static member inline CreateInterior(bounds: AxisAlignedBoundingBox, rightChild: int, splitAxis: int) =
         let mutable node = Unchecked.defaultof<BVHNode>
         node.Bounds <- bounds
+        node.RightChild <- rightChild
         node.IsLeaf <- false
         node.SplitAxis <- splitAxis
         node
@@ -82,7 +84,7 @@ type private Bin =
     static member inline Union(a: Bin, b: Bin) =
         Bin(AABB.Union(a.Bounds, b.Bounds), a.Count + b.Count)
 
-    member this.SAHCost = float32 this.Count * this.Bounds.SurfaceArea
+    member inline this.SAHCost = float32 this.Count * this.Bounds.SurfaceArea
 
 type BVHBuilder(config: BVHBuildConfig) =
     member this.Config = config
@@ -100,11 +102,9 @@ type BVHBuilder(config: BVHBuildConfig) =
                 nodes.Add(BVHNode.CreateLeaf(bounds, instanceOffset, instanceCount))
                 index
             | Interior(bounds, splitAxis, leftChild, rightChild) ->
-                let mutable node = BVHNode.CreateTemporary(bounds, splitAxis)
-                nodes.Add(node)
+                nodes.Add(Unchecked.defaultof<BVHNode>)
                 flatten leftChild |> ignore
-                node.RightChild <- flatten rightChild
-                nodes[index] <- node
+                nodes[index] <- BVHNode.CreateInterior(bounds, flatten rightChild, splitAxis)
                 index
         flatten root |> ignore
         nodes.ToArray()
@@ -113,16 +113,20 @@ type BVHBuilder(config: BVHBuildConfig) =
         let subtreeInstanceCount = last - first
         let subtreeInstances = instances.Slice(first, subtreeInstanceCount).ToArray()
 
-        let subtreeBounds =
-            (AABB.Default, subtreeInstances)
-            ||> Array.fold (fun aabb instance -> AABB.Union(aabb, instance.bounds))
+        let mutable subtreeBounds = AABB.Default
+        for i = 0 to subtreeInstanceCount - 1 do
+            let bounds = &subtreeInstances[i].bounds
+            subtreeBounds.PMin <- Vector3.Min(subtreeBounds.PMin, bounds.PMin)
+            subtreeBounds.PMax <- Vector3.Max(subtreeBounds.PMax, bounds.PMax)
         
         if subtreeInstanceCount <= this.Config.MaxLeafSize || depth >= this.Config.MaxDepth then
             Leaf(subtreeBounds, first, subtreeInstanceCount)
         else
-            let centroidBounds =
-                (AABB.Default, subtreeInstances)
-                ||> Array.fold (fun aabb instance -> AABB.Union(aabb, instance.bounds.Center))
+            let mutable centroidBounds = AABB.Default
+            for i = 0 to subtreeInstanceCount - 1 do
+                let centroid = subtreeInstances[i].bounds.Center
+                centroidBounds.PMin <- Vector3.Min(centroidBounds.PMin, centroid)
+                centroidBounds.PMax <- Vector3.Max(centroidBounds.PMax, centroid)
 
             let splitAxis = centroidBounds.SplitAxis
             let splitExtent = centroidBounds.Diagonal[splitAxis]
@@ -137,7 +141,7 @@ type BVHBuilder(config: BVHBuildConfig) =
 
                 Interior(subtreeBounds, splitAxis, leftSubtree, rightSubtree)
             else
-                let mutable bins = Array.create config.SAHBinCount Bin.Default
+                let bins = Array.create config.SAHBinCount Bin.Default
 
                 let inline findBinIndex (instance: BVHBuildInstance) =
                     ((float32 config.SAHBinCount
@@ -161,29 +165,35 @@ type BVHBuilder(config: BVHBuildConfig) =
                     costs[i] <- costs[i] + leftBin.SAHCost
                     costs[config.SAHBinCount - 2 - i] <- costs[config.SAHBinCount - 2 - i] + rightBin.SAHCost
 
-                let splitIndex =
-                    costs |> Array.mapi (fun i cost -> i, cost) |> Array.minBy snd |> fst
-
-                let leftSubtreeInstances, rightSubtreeInstances =
-                    subtreeInstances
-                    |> Array.partition (fun instance -> findBinIndex instance <= splitIndex)
-
-                leftSubtreeInstances.CopyTo(instances.Slice(first, leftSubtreeInstances.Length))
-
-                rightSubtreeInstances.CopyTo(
-                    instances.Slice(first + leftSubtreeInstances.Length, rightSubtreeInstances.Length)
-                )
+                let mutable minCost = infinityf
+                let mutable bestSplitIndex = 0
+                for i = 0 to config.SAHBinCount - 2 do
+                    let cost = costs[i] + float32 subtreeInstanceCount * centroidBounds.SurfaceArea
+                    if cost < minCost then
+                        minCost <- cost
+                        bestSplitIndex <- i
+                let mutable left = first
+                let mutable right = last - 1
+                for i = 0 to subtreeInstanceCount - 1 do
+                    let instance = subtreeInstances[i]
+                    let binIndex = findBinIndex instance
+                    if binIndex > bestSplitIndex then
+                        instances[right] <- instance
+                        right <- right - 1
+                    else
+                        instances[left] <- instance
+                        left <- left + 1
 
                 let leftSubtree =
-                    this.BuildSubtree(instances, first, first + leftSubtreeInstances.Length, depth + 1)
+                    this.BuildSubtree(instances, first, left, depth + 1)
 
                 let rightSubtree =
-                    this.BuildSubtree(instances, first + leftSubtreeInstances.Length, last, depth + 1)
+                    this.BuildSubtree(instances, right + 1, last, depth + 1)
 
                 Interior(subtreeBounds, splitAxis, leftSubtree, rightSubtree)
 
     member this.Build(aabbs: AABB array): int array * BVHNode array =
-        let instances = aabbs |> Array.mapi (fun i aabb -> { bounds = aabb; id = i })
+        let instances = Array.init aabbs.Length (fun i -> { bounds = aabbs[i]; id = i })
         let nodes = this.BuildSubtree(instances.AsSpan(), 0, instances.Length, 0) |> BVHBuilder.Flatten
         let indices = instances |> Array.map (_.id)
         indices, nodes
