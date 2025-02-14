@@ -3,7 +3,7 @@
 open System.Numerics
     
 [<AbstractClass>]
-type LightSamplerBase(primitiveInstances: PrimitiveInstance[]) =
+type LightSamplerBase(primitiveInstances: PrimitiveInstance array) =
     let instances = primitiveInstances |> Array.filter (_.HasLight)
     do if instances.Length = 0 then
         failwith "LightSamplerBase: No light primitives found."

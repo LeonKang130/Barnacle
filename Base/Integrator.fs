@@ -14,7 +14,7 @@ type ProgressiveIntegrator(spp: int) =
     let mutable _frameId = 0
     member this.SamplePerPixel = spp
 
-    override this.Render(camera: CameraBase, film: Film, primitive: PrimitiveAggregate, lightSampler: LightSamplerBase) =
+    override this.Render(camera: CameraBase, film: Film, aggregate: PrimitiveAggregate, lightSampler: LightSamplerBase) =
         let inline renderRow (y: int) =
             for x = 0 to film.ImageWidth - 1 do
                 let mutable radiance = Vector3.Zero
@@ -28,7 +28,7 @@ type ProgressiveIntegrator(spp: int) =
 
                     radiance <-
                         radiance
-                        + (1f / float32 this.SamplePerPixel * pdf) * this.Li(&ray, primitive, lightSampler, &sampler)
+                        + (1f / float32 this.SamplePerPixel * pdf) * this.Li(&ray, aggregate, lightSampler, &sampler)
 
                 film.SetPixel((x, y), radiance)
 

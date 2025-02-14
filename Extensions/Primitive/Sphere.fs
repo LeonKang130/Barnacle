@@ -78,7 +78,7 @@ type SpherePrimitive(radius: float32) =
                 else
                     false
     
-    override this.GetBounds() = AxisAlignedBoundingBox(Vector3(-this.Radius), Vector3(this.Radius))
+    override this.Bounds = AxisAlignedBoundingBox(Vector3(-this.Radius), Vector3(this.Radius))
 
 type SphereInstance(sphere: SpherePrimitive, material: MaterialBase option, light: LightBase option) =
     inherit PrimitiveInstance(sphere, material, light)

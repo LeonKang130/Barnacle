@@ -12,6 +12,7 @@
     <Compile Include="Base\Material.fs" />
     <Compile Include="Base\Light.fs" />
     <Compile Include="Base\Primitive.fs" />
+    <Compile Include="Base\BVH.fs" />
     <Compile Include="Base\Film.fs" />
     <Compile Include="Base\LightSampler.fs" />
     <Compile Include="Base\Integrator.fs" />
@@ -23,6 +24,7 @@
     <Compile Include="Extensions\Integrator\PathTracing.fs" />
     <Compile Include="Extensions\Material\Lambertian.fs" />
     <Compile Include="Extensions\LightSampler\Uniform.fs" />
+    <Compile Include="Extensions\Aggregate\BVH.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

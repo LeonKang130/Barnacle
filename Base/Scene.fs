@@ -28,7 +28,7 @@ type KeyFrame =
         let scale = Vector3.Lerp(s1, s2, ratio)
         Util.Compose(scale, rotation, translation)
 
-type Transform(keyFrames: KeyFrame[]) =
+type Transform(keyFrames: KeyFrame array) =
     do if keyFrames.Length = 0 then raise (ArgumentException "KeyFrames cannot be empty")
     new() = Transform([| KeyFrame(0f, Matrix4x4.Identity) |])
     new(m: Matrix4x4) = Transform([| KeyFrame(0f, m) |])
@@ -44,9 +44,9 @@ type Transform(keyFrames: KeyFrame[]) =
                 KeyFrame.Interpolate(&prevFrame, &nextFrame, t)
             | None -> this.KeyFrames[0].Matrix)
     
-type Node(transform: Transform, children: Node[], instances: PrimitiveInstance[]) =
-    new(transform: Transform, instances: PrimitiveInstance[]) = Node(transform, [||], instances)
-    new(transform: Transform, children: Node[]) = Node(transform, children, [||])
+type Node(transform: Transform, children: Node array, instances: PrimitiveInstance array) =
+    new(transform: Transform, instances: PrimitiveInstance array) = Node(transform, [||], instances)
+    new(transform: Transform, children: Node array) = Node(transform, children, [||])
     member this.Transform = transform
     member this.Children = children
     member this.Instances = instances

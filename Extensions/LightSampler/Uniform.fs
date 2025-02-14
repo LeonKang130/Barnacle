@@ -4,7 +4,7 @@ open Barnacle.Base
 open System
 open System.Numerics
 
-type UniformLightSampler(primitiveInstances: PrimitiveInstance[]) =
+type UniformLightSampler(primitiveInstances: PrimitiveInstance array) =
     inherit LightSamplerBase(primitiveInstances)
 
     override this.Sample(p: Vector3, uLight: Vector2) =

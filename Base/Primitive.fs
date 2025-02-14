@@ -5,19 +5,23 @@ open System.Numerics
 
 [<Struct>]
 type AxisAlignedBoundingBox =
-    val mutable pMin: Vector3
-    val mutable pMax: Vector3
-    new(pMin: Vector3, pMax: Vector3) = { pMin = pMin; pMax = pMax }
-    member inline this.Center = 0.5f * (this.pMin + this.pMax)
-    member inline this.Diagonal = this.pMax - this.pMin
+    val mutable PMin: Vector3
+    val mutable PMax: Vector3
+    new(pMin: Vector3, pMax: Vector3) = { PMin = pMin; PMax = pMax }
+    member inline this.Center = 0.5f * (this.PMin + this.PMax)
+    member inline this.Diagonal = this.PMax - this.PMin
 
     member inline this.SurfaceArea =
-        2f
-        * (this.Diagonal.X * this.Diagonal.Y
-           + this.Diagonal.Y * this.Diagonal.Z
-           + this.Diagonal.Z * this.Diagonal.X)
+        let diag = this.Diagonal
+        2f * (diag.X * diag.Y + diag.Y * diag.Z + diag.Z * diag.X)
 
-    member inline this.Volume = this.Diagonal.X * this.Diagonal.Y * this.Diagonal.Z
+    member inline this.Volume =
+        let diag = this.Diagonal
+        diag.X * diag.Y * diag.Z
+    member inline this.SplitAxis =
+        let diag = this.Diagonal
+        if diag.X >= diag.Y && diag.X >= diag.Z then 0
+        elif diag.Y >= diag.Z then 1 else 2
 
     member inline this.Intersect(ray: Ray inref, t: float32) : bool =
         let invDir = Vector3.One / ray.Direction
@@ -25,8 +29,8 @@ type AxisAlignedBoundingBox =
         let mutable tMax = t
 
         for i = 0 to 2 do
-            let t0 = (this.pMin[i] - ray.Origin[i]) * invDir[i]
-            let t1 = (this.pMax[i] - ray.Origin[i]) * invDir[i]
+            let t0 = (this.PMin[i] - ray.Origin[i]) * invDir[i]
+            let t1 = (this.PMax[i] - ray.Origin[i]) * invDir[i]
             tMin <- MathF.Max(tMin, MathF.Min(t0, t1))
             tMax <- MathF.Min(tMax, MathF.Max(t0, t1))
 
@@ -36,9 +40,9 @@ type AxisAlignedBoundingBox =
         let mutable pMin, pMax = Vector3.PositiveInfinity, Vector3.NegativeInfinity
 
         for i = 0 to 7 do
-            let pX = if i &&& 1 = 0 then aabb.pMin.X else aabb.pMax.X
-            let pY = if i &&& 2 = 0 then aabb.pMin.Y else aabb.pMax.Y
-            let pZ = if i &&& 4 = 0 then aabb.pMin.Z else aabb.pMax.Z
+            let pX = if i &&& 1 = 0 then aabb.PMin.X else aabb.PMax.X
+            let pY = if i &&& 2 = 0 then aabb.PMin.Y else aabb.PMax.Y
+            let pZ = if i &&& 4 = 0 then aabb.PMin.Z else aabb.PMax.Z
             let p = Vector3.Transform(Vector3(pX, pY, pZ), m)
             pMin <- Vector3.Min(pMin, p)
             pMax <- Vector3.Max(pMax, p)
@@ -46,7 +50,10 @@ type AxisAlignedBoundingBox =
         AxisAlignedBoundingBox(pMin, pMax)
     
     static member inline Union(a: AxisAlignedBoundingBox, b: AxisAlignedBoundingBox) =
-        AxisAlignedBoundingBox(Vector3.Min(a.pMin, b.pMin), Vector3.Max(a.pMax, b.pMax))
+        AxisAlignedBoundingBox(Vector3.Min(a.PMin, b.PMin), Vector3.Max(a.PMax, b.PMax))
+    static member inline Union(a: AxisAlignedBoundingBox, b: Vector3) =
+        AxisAlignedBoundingBox(Vector3.Min(a.PMin, b), Vector3.Max(a.PMax, b))
+    static member Default = AxisAlignedBoundingBox(Vector3.PositiveInfinity, Vector3.NegativeInfinity)
 
 [<Struct>]
 type OrthonormalBasis =
@@ -105,7 +112,7 @@ type LocalGeometry =
 type ElementalPrimitive() =
     abstract member Intersect: Ray inref * float32 -> bool
     abstract member Intersect: Ray inref * LocalGeometry outref * float32 byref -> bool
-    abstract member GetBounds: unit -> AxisAlignedBoundingBox
+    abstract member Bounds: AxisAlignedBoundingBox
 
 [<Struct>]
 type Interaction =
@@ -142,28 +149,30 @@ and [<AbstractClass>] PrimitiveInstance
     member this.Primitive = primitive
     member val ObjectToWorld = Matrix4x4.Identity with get, set
     member val WorldToObject = Matrix4x4.Identity with get, set
-    
-    member this.Bounds =
-        let bounds = primitive.GetBounds()
-        AxisAlignedBoundingBox.Transform(&bounds, this.ObjectToWorld)
-
+    member val Bounds = AxisAlignedBoundingBox.Default with get, set
     member this.HasMaterial = material.IsSome
     member this.Material = material.Value
     member this.HasLight = light.IsSome
     member this.Light = light.Value
 
     member inline this.Intersect(ray: Ray inref, t: float32) =
-        let ray = Ray.Transform(&ray, this.WorldToObject)
-        this.Primitive.Intersect(&ray, t)
+        if this.Bounds.Intersect(&ray, t) then
+            let ray = Ray.Transform(&ray, this.WorldToObject)
+            this.Primitive.Intersect(&ray, t)
+        else
+            false
 
     member inline this.Intersect(ray: Ray inref, interaction: Interaction outref, t: float32 byref) =
-        let ray = Ray.Transform(&ray, this.WorldToObject)
-        let mutable geom = Unchecked.defaultof<LocalGeometry>
+        if this.Bounds.Intersect(&ray, t) then
+            let ray = Ray.Transform(&ray, this.WorldToObject)
+            let mutable geom = Unchecked.defaultof<LocalGeometry>
 
-        if this.Primitive.Intersect(&ray, &geom, &t) then
-            interaction.geom <- LocalGeometry.Transform(&geom, this.ObjectToWorld)
-            interaction.inst <- this
-            true
+            if this.Primitive.Intersect(&ray, &geom, &t) then
+                interaction.geom <- LocalGeometry.Transform(&geom, this.ObjectToWorld)
+                interaction.inst <- this
+                true
+            else
+                false
         else
             false
 
@@ -173,26 +182,28 @@ and [<AbstractClass>] PrimitiveInstance
             let mutable inv = Matrix4x4.Identity
             Matrix4x4.Invert(objectToWorld, &inv) |> ignore
             inv
+        this.Bounds <-
+            let bounds = this.Primitive.Bounds
+            AxisAlignedBoundingBox.Transform(&bounds, objectToWorld)
     
     abstract member Sample: Vector2 -> Interaction * float32
     abstract member EvalPDF: Interaction inref -> float32
 
 [<AbstractClass>]
-type PrimitiveAggregate(instances: PrimitiveInstance[]) =
-    member this.Instances = instances
+type PrimitiveAggregate() =
     abstract member Intersect: Ray inref * float32 -> bool
     abstract member Intersect: Ray inref * Interaction outref * float32 byref -> bool
 
-type ListAggregate(instances: PrimitiveInstance[]) =
-    inherit PrimitiveAggregate(instances)
+type ListAggregate(instances: PrimitiveInstance array) =
+    inherit PrimitiveAggregate()
+    member this.Instances = instances
 
     override this.Intersect(ray: Ray inref, t: float32) =
         let mutable hit = false
         let mutable instanceId = 0
 
         while not hit && instanceId < this.Instances.Length do
-            if this.Instances[instanceId].Bounds.Intersect(&ray, t) then
-                hit <- this.Instances[instanceId].Intersect(&ray, t) || hit
+            hit <- this.Instances[instanceId].Intersect(&ray, t)
             instanceId <- instanceId + 1
 
         hit
@@ -201,7 +212,6 @@ type ListAggregate(instances: PrimitiveInstance[]) =
         let mutable hit = false
 
         for instance in this.Instances do
-            if instance.Bounds.Intersect(&ray, t) then
-                hit <- instance.Intersect(&ray, &interaction, &t) || hit
+            hit <- instance.Intersect(&ray, &interaction, &t) || hit
 
         hit

@@ -3,6 +3,7 @@ open Barnacle.Extensions.Camera
 open Barnacle.Extensions.Primitive
 open Barnacle.Extensions.Material
 open Barnacle.Extensions.LightSampler
+open Barnacle.Extensions.Aggregate
 open Barnacle.Extensions.Integrator
 open System.Numerics
 
@@ -29,9 +30,9 @@ let main _ =
     |])
     let mutable scene = Scene(node)
     let instances = scene.Traverse(0f)
-    let aggregate = ListAggregate(instances)
+    let aggregate = BVHAggregate(instances)
     let lightSampler = UniformLightSampler(instances)
-    let integrator = DirectIntegrator(16)
+    let integrator = PathTracingIntegrator(32)
     integrator.Render(camera, film, aggregate, lightSampler)
     film.Save "image.ppm"
     0
