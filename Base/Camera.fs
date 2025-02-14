@@ -4,7 +4,7 @@ open System.Numerics
 
 [<AbstractClass>]
 type CameraBase(pushForward: float32) =
-    member val private _cameraToWorld = Matrix4x4.Identity with get, set
+    member val private _cameraToWorld = Unchecked.defaultof<Matrix4x4> with get, set
     member this.PushForward = pushForward
     abstract member GenerateRay: (int * int) * (int * int) * Vector2 * Vector2 -> (Ray * float32)
     member this.UpdateTransform(cameraToWorld: Matrix4x4) = this._cameraToWorld <- cameraToWorld

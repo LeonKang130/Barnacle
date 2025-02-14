@@ -147,9 +147,9 @@ type Interaction =
 and [<AbstractClass>] PrimitiveInstance
     (primitive: ElementalPrimitive, material: MaterialBase option, light: LightBase option) =
     member this.Primitive = primitive
-    member val ObjectToWorld = Matrix4x4.Identity with get, set
-    member val WorldToObject = Matrix4x4.Identity with get, set
-    member val Bounds = AxisAlignedBoundingBox.Default with get, set
+    member val ObjectToWorld = Unchecked.defaultof<Matrix4x4> with get, set
+    member val WorldToObject = Unchecked.defaultof<Matrix4x4> with get, set
+    member val Bounds = Unchecked.defaultof<AxisAlignedBoundingBox> with get, set
     member this.HasMaterial = material.IsSome
     member this.Material = material.Value
     member this.HasLight = light.IsSome
