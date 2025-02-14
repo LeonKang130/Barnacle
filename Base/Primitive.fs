@@ -5,11 +5,11 @@ open System.Numerics
 
 [<Struct>]
 type AxisAlignedBoundingBox =
-    val mutable PMin: Vector3
-    val mutable PMax: Vector3
-    new(pMin: Vector3, pMax: Vector3) = { PMin = pMin; PMax = pMax }
-    member inline this.Center = 0.5f * (this.PMin + this.PMax)
-    member inline this.Diagonal = this.PMax - this.PMin
+    val mutable pMin: Vector3
+    val mutable pMax: Vector3
+    new(pMin: Vector3, pMax: Vector3) = { pMin = pMin; pMax = pMax }
+    member inline this.Center = 0.5f * (this.pMin + this.pMax)
+    member inline this.Diagonal = this.pMax - this.pMin
 
     member inline this.SurfaceArea =
         let diag = this.Diagonal
@@ -29,8 +29,8 @@ type AxisAlignedBoundingBox =
         let mutable tMax = t
 
         for i = 0 to 2 do
-            let t0 = (this.PMin[i] - ray.Origin[i]) * invDir[i]
-            let t1 = (this.PMax[i] - ray.Origin[i]) * invDir[i]
+            let t0 = (this.pMin[i] - ray.Origin[i]) * invDir[i]
+            let t1 = (this.pMax[i] - ray.Origin[i]) * invDir[i]
             tMin <- MathF.Max(tMin, MathF.Min(t0, t1))
             tMax <- MathF.Min(tMax, MathF.Max(t0, t1))
 
@@ -40,9 +40,9 @@ type AxisAlignedBoundingBox =
         let mutable pMin, pMax = Vector3.PositiveInfinity, Vector3.NegativeInfinity
 
         for i = 0 to 7 do
-            let pX = if i &&& 1 = 0 then aabb.PMin.X else aabb.PMax.X
-            let pY = if i &&& 2 = 0 then aabb.PMin.Y else aabb.PMax.Y
-            let pZ = if i &&& 4 = 0 then aabb.PMin.Z else aabb.PMax.Z
+            let pX = if i &&& 1 = 0 then aabb.pMin.X else aabb.pMax.X
+            let pY = if i &&& 2 = 0 then aabb.pMin.Y else aabb.pMax.Y
+            let pZ = if i &&& 4 = 0 then aabb.pMin.Z else aabb.pMax.Z
             let p = Vector3.Transform(Vector3(pX, pY, pZ), m)
             pMin <- Vector3.Min(pMin, p)
             pMax <- Vector3.Max(pMax, p)
@@ -50,9 +50,9 @@ type AxisAlignedBoundingBox =
         AxisAlignedBoundingBox(pMin, pMax)
     
     static member inline Union(a: AxisAlignedBoundingBox, b: AxisAlignedBoundingBox) =
-        AxisAlignedBoundingBox(Vector3.Min(a.PMin, b.PMin), Vector3.Max(a.PMax, b.PMax))
+        AxisAlignedBoundingBox(Vector3.Min(a.pMin, b.pMin), Vector3.Max(a.pMax, b.pMax))
     static member inline Union(a: AxisAlignedBoundingBox, b: Vector3) =
-        AxisAlignedBoundingBox(Vector3.Min(a.PMin, b), Vector3.Max(a.PMax, b))
+        AxisAlignedBoundingBox(Vector3.Min(a.pMin, b), Vector3.Max(a.pMax, b))
     static member Default = AxisAlignedBoundingBox(Vector3.PositiveInfinity, Vector3.NegativeInfinity)
 
 [<Struct>]
@@ -196,14 +196,13 @@ type PrimitiveAggregate() =
 
 type ListAggregate(instances: PrimitiveInstance array) =
     inherit PrimitiveAggregate()
-    member this.Instances = instances
 
     override this.Intersect(ray: Ray inref, t: float32) =
         let mutable hit = false
         let mutable instanceId = 0
 
-        while not hit && instanceId < this.Instances.Length do
-            hit <- this.Instances[instanceId].Intersect(&ray, t)
+        while not hit && instanceId < instances.Length do
+            hit <- instances[instanceId].Intersect(&ray, t)
             instanceId <- instanceId + 1
 
         hit
@@ -211,7 +210,7 @@ type ListAggregate(instances: PrimitiveInstance array) =
     override this.Intersect(ray: Ray inref, interaction: Interaction outref, t: float32 byref) =
         let mutable hit = false
 
-        for instance in this.Instances do
+        for instance in instances do
             hit <- instance.Intersect(&ray, &interaction, &t) || hit
 
         hit

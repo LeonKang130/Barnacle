@@ -116,8 +116,8 @@ type BVHBuilder(config: BVHBuildConfig) =
         let mutable subtreeBounds = AABB.Default
         for i = 0 to subtreeInstanceCount - 1 do
             let bounds = &subtreeInstances[i].bounds
-            subtreeBounds.PMin <- Vector3.Min(subtreeBounds.PMin, bounds.PMin)
-            subtreeBounds.PMax <- Vector3.Max(subtreeBounds.PMax, bounds.PMax)
+            subtreeBounds.pMin <- Vector3.Min(subtreeBounds.pMin, bounds.pMin)
+            subtreeBounds.pMax <- Vector3.Max(subtreeBounds.pMax, bounds.pMax)
         
         if subtreeInstanceCount <= this.Config.MaxLeafSize || depth >= this.Config.MaxDepth then
             Leaf(subtreeBounds, first, subtreeInstanceCount)
@@ -125,8 +125,8 @@ type BVHBuilder(config: BVHBuildConfig) =
             let mutable centroidBounds = AABB.Default
             for i = 0 to subtreeInstanceCount - 1 do
                 let centroid = subtreeInstances[i].bounds.Center
-                centroidBounds.PMin <- Vector3.Min(centroidBounds.PMin, centroid)
-                centroidBounds.PMax <- Vector3.Max(centroidBounds.PMax, centroid)
+                centroidBounds.pMin <- Vector3.Min(centroidBounds.pMin, centroid)
+                centroidBounds.pMax <- Vector3.Max(centroidBounds.pMax, centroid)
 
             let splitAxis = centroidBounds.SplitAxis
             let splitExtent = centroidBounds.Diagonal[splitAxis]
@@ -145,7 +145,7 @@ type BVHBuilder(config: BVHBuildConfig) =
 
                 let inline findBinIndex (instance: BVHBuildInstance) =
                     ((float32 config.SAHBinCount
-                      * (instance.bounds.Center[splitAxis] - centroidBounds.PMin[splitAxis]))
+                      * (instance.bounds.Center[splitAxis] - centroidBounds.pMin[splitAxis]))
                      / splitExtent)
                     |> int
                     |> min (config.SAHBinCount - 1)

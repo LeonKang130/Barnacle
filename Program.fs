@@ -32,7 +32,7 @@ let main _ =
     let instances = scene.Traverse(0f)
     let aggregate = BVHAggregate(instances)
     let lightSampler = UniformLightSampler(instances)
-    let integrator = PathTracingIntegrator(32)
+    let integrator = PathTracingIntegrator(256)
     integrator.Render(camera, film, aggregate, lightSampler)
     film.Save "image.ppm"
     0

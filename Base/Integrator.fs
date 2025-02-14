@@ -1,5 +1,6 @@
 ﻿namespace Barnacle.Base
 
+open System
 open System.Numerics
 open System.Threading.Tasks
 
@@ -17,7 +18,7 @@ type ProgressiveIntegrator(spp: int) =
     override this.Render(camera: CameraBase, film: Film, aggregate: PrimitiveAggregate, lightSampler: LightSamplerBase) =
         let inline renderRow (y: int) =
             for x = 0 to film.ImageWidth - 1 do
-                let mutable radiance = Vector3.Zero
+                let mutable accum = Vector3.Zero
 
                 for sampleId = 0 to this.SamplePerPixel - 1 do
                     let mutable sampler =
@@ -25,12 +26,13 @@ type ProgressiveIntegrator(spp: int) =
 
                     let ray, pdf =
                         camera.GeneratePrimaryRay(film.Resolution, (x, y), sampler.Next2D(), sampler.Next2D())
+                    let mutable radiance = this.Li(&ray, aggregate, lightSampler, &sampler) / pdf
+                    radiance.X <- if Single.IsNaN radiance.X then 0f else radiance.X
+                    radiance.Y <- if Single.IsNaN radiance.Y then 0f else radiance.Y
+                    radiance.Z <- if Single.IsNaN radiance.Z then 0f else radiance.Z
+                    accum <- accum + (1f / float32 this.SamplePerPixel) * radiance
 
-                    radiance <-
-                        radiance
-                        + (1f / float32 this.SamplePerPixel * pdf) * this.Li(&ray, aggregate, lightSampler, &sampler)
-
-                film.SetPixel((x, y), radiance)
+                film.SetPixel((x, y), accum)
 
         seq { 0 .. film.ImageHeight - 1 }
         |> Seq.map (fun y -> Task.Run(fun () -> renderRow y))
