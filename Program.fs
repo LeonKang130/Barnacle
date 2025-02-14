@@ -11,7 +11,8 @@ open System.Numerics
 let main _ =
     let imageWidth, imageHeight = 1024, 768
     let mutable film = Film((imageWidth, imageHeight), ToneMapping.Aces)
-    let mutable camera = PinholeCamera(30f, float32 imageWidth / float32 imageHeight, 140f)
+    // let mutable camera = PinholeCamera(30f, float32 imageWidth / float32 imageHeight, 140f)
+    let mutable camera = ThinLensCamera(10f, 215f, 30f, float32 imageWidth / float32 imageHeight, 140f)
     camera.UpdateTransform(Matrix4x4.CreateTranslation(50f, 40.8f, 295.6f))
     let whiteMaterial = Lambertian(Vector3(0.75f)) :> MaterialBase
     let blackMaterial = Lambertian(Vector3.Zero) :> MaterialBase
