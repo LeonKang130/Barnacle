@@ -2,11 +2,12 @@
 
 open System
 open System.Numerics
+open System.Runtime.CompilerServices
 
-[<Struct>]
+[<IsReadOnly; Struct>]
 type AxisAlignedBoundingBox =
-    val mutable pMin: Vector3
-    val mutable pMax: Vector3
+    val pMin: Vector3
+    val pMax: Vector3
     new(pMin: Vector3, pMax: Vector3) = { pMin = pMin; pMax = pMax }
     member inline this.Center = 0.5f * (this.pMin + this.pMax)
     member inline this.Diagonal = this.pMax - this.pMin
@@ -48,6 +49,8 @@ type AxisAlignedBoundingBox =
             pMax <- Vector3.Max(pMax, p)
 
         AxisAlignedBoundingBox(pMin, pMax)
+    static member inline Transform(aabb: AxisAlignedBoundingBox, m: Matrix4x4) =
+        AxisAlignedBoundingBox.Transform(&aabb, m)
     
     static member inline Union(a: AxisAlignedBoundingBox, b: AxisAlignedBoundingBox) =
         AxisAlignedBoundingBox(Vector3.Min(a.pMin, b.pMin), Vector3.Max(a.pMax, b.pMax))
@@ -55,7 +58,7 @@ type AxisAlignedBoundingBox =
         AxisAlignedBoundingBox(Vector3.Min(a.pMin, b), Vector3.Max(a.pMax, b))
     static member Default = AxisAlignedBoundingBox(Vector3.PositiveInfinity, Vector3.NegativeInfinity)
 
-[<Struct>]
+[<IsReadOnly; Struct>]
 type OrthonormalBasis =
     val n: Vector3
     val t: Vector3
@@ -89,12 +92,14 @@ type OrthonormalBasis =
         let b = Vector3.Transform(onb.b, m) - m.Translation |> Vector3.Normalize
         let n = Vector3.Cross(t, b)
         OrthonormalBasis(n, t, b)
+    static member inline Transform(onb: OrthonormalBasis, m: Matrix4x4) =
+        OrthonormalBasis.Transform(&onb, m)
 
 [<Struct>]
 type LocalGeometry =
-    val mutable p: Vector3
-    val mutable onb: OrthonormalBasis
-    val mutable uv: Vector2
+    val p: Vector3
+    val onb: OrthonormalBasis
+    val uv: Vector2
     val mutable tag: int // for primitives containing multiple sub-primitives, e.g. triangle meshes
     new(p: Vector3, onb: OrthonormalBasis, uv: Vector2, tag: int) = { p = p; onb = onb; uv = uv; tag = tag }
     new(p: Vector3, onb: OrthonormalBasis, uv: Vector2) = { p = p; onb = onb; uv = uv; tag = 0 }
@@ -107,6 +112,8 @@ type LocalGeometry =
 
     static member inline Transform(g: LocalGeometry inref, m: Matrix4x4) =
         LocalGeometry(Vector3.Transform(g.p, m), OrthonormalBasis.Transform(&g.onb, m), g.uv)
+    static member inline Transform(g: LocalGeometry, m: Matrix4x4) =
+        LocalGeometry.Transform(&g, m)
 
 [<AbstractClass>]
 type ElementalPrimitive() =
@@ -165,10 +172,9 @@ and [<AbstractClass>] PrimitiveInstance
     member inline this.Intersect(ray: Ray inref, interaction: Interaction outref, t: float32 byref) =
         if this.Bounds.Intersect(&ray, t) then
             let ray = Ray.Transform(&ray, this.WorldToObject)
-            let mutable geom = Unchecked.defaultof<LocalGeometry>
 
-            if this.Primitive.Intersect(&ray, &geom, &t) then
-                interaction.geom <- LocalGeometry.Transform(&geom, this.ObjectToWorld)
+            if this.Primitive.Intersect(&ray, &interaction.geom, &t) then
+                interaction.geom <- LocalGeometry.Transform(&interaction.geom, this.ObjectToWorld)
                 interaction.inst <- this
                 true
             else
@@ -183,8 +189,7 @@ and [<AbstractClass>] PrimitiveInstance
             Matrix4x4.Invert(objectToWorld, &inv) |> ignore
             inv
         this.Bounds <-
-            let bounds = this.Primitive.Bounds
-            AxisAlignedBoundingBox.Transform(&bounds, objectToWorld)
+            AxisAlignedBoundingBox.Transform(this.Primitive.Bounds, objectToWorld)
     
     abstract member Sample: Vector2 -> Interaction * float32
     abstract member EvalPDF: Interaction inref -> float32

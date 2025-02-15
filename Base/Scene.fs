@@ -4,7 +4,7 @@ open System
 open System.Numerics
 open Microsoft.FSharp.Core
 
-module internal Util =
+module private SceneTransformUtil =
     let inline Compose(s: Vector3, r: Quaternion, t: Vector3) =
         Matrix4x4.CreateTranslation(s) * Matrix4x4.CreateFromQuaternion(r) * Matrix4x4.CreateScale(t)
     let inline Decompose(m: Matrix4x4) =
@@ -21,12 +21,12 @@ type KeyFrame =
     new(time: float32, matrix: Matrix4x4) = { Time = time; Matrix = matrix }
     static member inline Interpolate(a: KeyFrame inref, b: KeyFrame inref, t: float32) =
         let ratio = (t - a.Time) / (b.Time - a.Time)
-        let t1, r1, s1 = Util.Decompose(a.Matrix)
-        let t2, r2, s2 = Util.Decompose(b.Matrix)
+        let t1, r1, s1 = SceneTransformUtil.Decompose(a.Matrix)
+        let t2, r2, s2 = SceneTransformUtil.Decompose(b.Matrix)
         let translation = Vector3.Lerp(t1, t2, ratio)
         let rotation = Quaternion.Slerp(r1, r2, ratio)
         let scale = Vector3.Lerp(s1, s2, ratio)
-        Util.Compose(scale, rotation, translation)
+        SceneTransformUtil.Compose(scale, rotation, translation)
 
 type Transform(keyFrames: KeyFrame array) =
     do if keyFrames.Length = 0 then raise (ArgumentException "KeyFrames cannot be empty")

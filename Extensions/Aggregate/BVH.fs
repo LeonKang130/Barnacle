@@ -1,50 +1,65 @@
-﻿namespace Barnacle.Extensions.Aggregate
+﻿#nowarn "9"
+namespace Barnacle.Extensions.Aggregate
 
 open Barnacle.Base
+open System
+open Microsoft.FSharp.NativeInterop
+
+module private TLASTraversal =
+    let inline stackalloc<'a when 'a: unmanaged> (length: int): Span<'a> =
+        let p = NativePtr.stackalloc<'a> length |> NativePtr.toVoidPtr
+        Span<'a>(p, length)
 
 type BVHAggregate(instances: PrimitiveInstance array) =
     inherit PrimitiveAggregate()
-    let instanceIndices, bvhNodes =
-        instances
-        |> Array.map (_.Bounds)
-        |> BVHBuilder.Default.Build
-    let instances =
-        Array.init instances.Length (fun i -> instances[instanceIndices[i]])
-    member private this.TraverseAny(ray: Ray inref, t: float32, i: int) =
-        let node = bvhNodes[i]
-        if node.Bounds.Intersect(&ray, t) then
-            if node.IsLeaf then
-                let mutable hit = false
-                let mutable instanceId = node.InstanceOffset
-                while not hit && instanceId < node.InstanceOffset + node.InstanceCount do
-                    hit <- instances[instanceId].Intersect(&ray, t)
-                    instanceId <- instanceId + 1
-                hit
-            else
-                if ray.Direction[node.SplitAxis] > 0f then
-                    this.TraverseAny(&ray, t, i + 1) || this.TraverseAny(&ray, t, node.RightChild)
-                else
-                    this.TraverseAny(&ray, t, node.RightChild) || this.TraverseAny(&ray, t, i + 1)
-        else
-            false
-    member private this.TraverseClosest(ray: Ray inref, interaction: Interaction outref, t: float32 byref, i: int) =
-        let node = bvhNodes[i]
-        if node.Bounds.Intersect(&ray, t) then
-            if node.IsLeaf then
-                let mutable hit = false
-                for instanceId = node.InstanceOffset to node.InstanceOffset + node.InstanceCount - 1 do
-                    hit <- instances[instanceId].Intersect(&ray, &interaction, &t) || hit
-                hit
-            else
-                if ray.Direction[node.SplitAxis] > 0f then
-                    let hit = this.TraverseClosest(&ray, &interaction, &t, i + 1)
-                    this.TraverseClosest(&ray, &interaction, &t, node.RightChild) || hit
-                else
-                    let hit = this.TraverseClosest(&ray, &interaction, &t, node.RightChild)
-                    this.TraverseClosest(&ray, &interaction, &t, i + 1) || hit
-        else
-            false
+    member val private BVHNodes =
+        let builder = BVHBuilder.Default
+        if builder.Config.MaxDepth > 128 then
+            failwith "BVH depth potentially exceeds 128"
+        builder.Build(instances.AsSpan(), _.Bounds) with get
     override this.Intersect(ray: Ray inref, t: float32) =
-        this.TraverseAny(&ray, t, 0)
+        let traversalStack = TLASTraversal.stackalloc<int> 128
+        traversalStack[0] <- 0
+        let mutable stackTop = 1
+        let mutable hit = false
+        while not hit && stackTop <> 0 do
+            stackTop <- stackTop - 1
+            let i = traversalStack[stackTop]
+            let node = this.BVHNodes[i]
+            if node.Bounds.Intersect(&ray, t) then
+                if node.IsLeaf then
+                    let mutable instanceId = node.InstanceOffset
+                    while not hit && instanceId < node.InstanceOffset + node.InstanceCount do
+                        hit <- instances[instanceId].Intersect(&ray, t)
+                        instanceId <- instanceId + 1
+                else
+                    if ray.Direction[node.SplitAxis] > 0f then
+                        traversalStack[stackTop] <- node.RightChild
+                        traversalStack[stackTop + 1] <- i + 1
+                    else
+                        traversalStack[stackTop] <- i + 1
+                        traversalStack[stackTop + 1] <- node.RightChild
+                    stackTop <- stackTop + 2
+        hit
     override this.Intersect(ray: Ray inref, interaction: Interaction outref, t: float32 byref) =
-        this.TraverseClosest(&ray, &interaction, &t, 0)
+        let traversalStack = TLASTraversal.stackalloc<int> 128
+        traversalStack[0] <- 0
+        let mutable stackTop = 1
+        let mutable hit = false
+        while stackTop <> 0 do
+            stackTop <- stackTop - 1
+            let i = traversalStack[stackTop]
+            let node = this.BVHNodes[i]
+            if node.Bounds.Intersect(&ray, t) then
+                if node.IsLeaf then
+                    for instanceId = node.InstanceOffset to node.InstanceOffset + node.InstanceCount - 1 do
+                        hit <- instances[instanceId].Intersect(&ray, &interaction, &t) || hit
+                else
+                    if ray.Direction[node.SplitAxis] > 0f then
+                        traversalStack[stackTop] <- node.RightChild
+                        traversalStack[stackTop + 1] <- i + 1
+                    else
+                        traversalStack[stackTop] <- i + 1
+                        traversalStack[stackTop + 1] <- node.RightChild
+                    stackTop <- stackTop + 2
+        hit

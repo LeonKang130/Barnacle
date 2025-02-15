@@ -1,4 +1,5 @@
-﻿namespace Barnacle.Extensions.Integrator
+﻿#nowarn "9"
+namespace Barnacle.Extensions.Integrator
 
 open Barnacle.Base
 open System.Numerics
@@ -16,26 +17,29 @@ type PathTracingIntegrator(spp: int, maxDepth: int, rrDepth: int, rrThreshold: f
         let mutable beta = Vector3.One
         let mutable depth = 0
         let mutable pdfBSDF = 1e5f
+        let mutable interaction = Unchecked.defaultof<Interaction>
+        let mutable t = Unchecked.defaultof<float32>
+        let mutable lightSample = Unchecked.defaultof<LightSample>
+        let mutable bsdfSample = Unchecked.defaultof<BSDFSample>
         while depth < this.MaxDepth do
-            let mutable interaction = Unchecked.defaultof<Interaction>
-            let mutable t = infinityf
+            t <- infinityf
             if not (aggregate.Intersect(&ray, &interaction, &t)) then
                 depth <- this.MaxDepth
             else
                 if interaction.HasLight then
-                    let lightEval = lightSampler.Eval(ray.Origin, &interaction)
-                    let misWeight = pdfBSDF / (lightEval.pdf + pdfBSDF)
-                    L <- L + misWeight * beta * lightEval.L
+                    lightSample.eval <- lightSampler.Eval(ray.Origin, &interaction)
+                    let misWeight = pdfBSDF / (lightSample.eval.pdf + pdfBSDF)
+                    L <- L + misWeight * beta * lightSample.eval.L / lightSample.eval.pdf
                 if interaction.HasMaterial then
-                    let lightSample = lightSampler.Sample(interaction.Position, sampler.Next2D())
+                    lightSample <- lightSampler.Sample(interaction.Position, sampler.Next2D())
                     let shadowRay = interaction.SpawnRay(lightSample.wi)
                     let lightDistance = (lightSample.eval.p - interaction.Position).Length()
                     let occluded = aggregate.Intersect(&shadowRay, lightDistance - 1e-3f)
                     if not occluded then
-                        let bsdfEval = interaction.EvalBSDF(-ray.Direction, lightSample.wi)
-                        let misWeight = lightSample.eval.pdf / (lightSample.eval.pdf + bsdfEval.pdf)
-                        L <- L + misWeight * beta * bsdfEval.bsdf * lightSample.eval.L / lightSample.eval.pdf
-                    let bsdfSample = interaction.SampleBSDF(-ray.Direction, sampler.Next2D())
+                        bsdfSample.eval <- interaction.EvalBSDF(-ray.Direction, lightSample.wi)
+                        let misWeight = lightSample.eval.pdf / (lightSample.eval.pdf + bsdfSample.eval.pdf)
+                        L <- L + misWeight * beta * bsdfSample.eval.bsdf * lightSample.eval.L / lightSample.eval.pdf
+                    bsdfSample <- interaction.SampleBSDF(-ray.Direction, sampler.Next2D())
                     ray <- interaction.SpawnRay(bsdfSample.wi)
                     pdfBSDF <- bsdfSample.eval.pdf
                     beta <- beta * bsdfSample.eval.bsdf / pdfBSDF

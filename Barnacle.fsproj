@@ -18,7 +18,6 @@
     <Compile Include="Base\Integrator.fs" />
     <Compile Include="Base\Scene.fs" />
     <Compile Include="Extensions\Primitive\Sphere.fs" />
-    <Compile Include="Extensions\Primitive\Triangle.fs" />
     <Compile Include="Extensions\Primitive\Mesh.fs" />
     <Compile Include="Extensions\Camera\Pinhole.fs" />
     <Compile Include="Extensions\Camera\ThinLens.fs" />
