@@ -5,6 +5,7 @@ open System.Runtime.CompilerServices
 open Barnacle.Base
 open System
 open System.Numerics
+open System.IO
 open Microsoft.FSharp.NativeInterop
 
 [<IsReadOnly; Struct>]
@@ -176,6 +177,32 @@ type MeshPrimitive(vertices: Vector3 array, indices: int array) =
                     stackTop <- stackTop + 2
         hit
     override this.Bounds = this.BVHNodes[0].Bounds
+
+    static member Load(filePath: string) =
+        let vertices = ResizeArray<Vector3>()
+        let indices = ResizeArray<int>()
+        use reader = new StreamReader(filePath)
+        while not reader.EndOfStream do
+            let line = reader.ReadLine().Trim()
+            if (line.StartsWith "v ") || (line.StartsWith "f ") then
+                let tokens = line.Split([|' '|], StringSplitOptions.RemoveEmptyEntries)
+                if tokens.Length > 0 then
+                    match tokens[0] with
+                    | "v" ->
+                        vertices.Add(Vector3(float32 tokens[1], float32 tokens[2], float32 tokens[3]))
+                    | _ ->
+                        let faceIndices = ResizeArray<int>()
+                        for i in 1 .. tokens.Length - 1 do
+                            let vIndex = tokens[i].Split('/').[0]
+                            faceIndices.Add(int vIndex - 1)
+                        if faceIndices.Count >= 3 then
+                            let v0 = faceIndices.[0]
+                            for i in 1 .. faceIndices.Count - 2 do
+                                indices.Add(v0)
+                                indices.Add(faceIndices.[i])
+                                indices.Add(faceIndices.[i + 1])
+
+        MeshPrimitive(vertices.ToArray(), indices.ToArray())
 
 type MeshInstance(mesh: MeshPrimitive, material: MaterialBase option, light: LightBase option) =
     inherit PrimitiveInstance(mesh, material, light)
