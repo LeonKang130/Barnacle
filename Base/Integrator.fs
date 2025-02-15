@@ -47,8 +47,5 @@ type ProgressiveIntegrator(spp: int, tileSize: int) =
                     yield Task.Run(fun () -> this.RenderTile(tx, ty, camera, film, aggregate, lightSampler))
         }
         |> Seq.toArray
-        |> Task.WhenAll
-        |> Async.AwaitTask
-        |> Async.RunSynchronously
-
+        |> Task.WaitAll
         _frameId <- _frameId + 1
