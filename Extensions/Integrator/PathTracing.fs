@@ -16,11 +16,11 @@ type PathTracingIntegrator(spp: int, maxDepth: int, rrDepth: int, rrThreshold: f
         let mutable L = Vector3.Zero
         let mutable beta = Vector3.One
         let mutable depth = 0
-        let mutable pdfBSDF = 1e5f
         let mutable interaction = Unchecked.defaultof<Interaction>
         let mutable t = Unchecked.defaultof<float32>
         let mutable lightSample = Unchecked.defaultof<LightSample>
         let mutable bsdfSample = Unchecked.defaultof<BSDFSample>
+        bsdfSample.eval.pdf <- 1e5f
         while depth < this.MaxDepth do
             t <- infinityf
             if not (aggregate.Intersect(&ray, &interaction, &t)) then
@@ -28,8 +28,7 @@ type PathTracingIntegrator(spp: int, maxDepth: int, rrDepth: int, rrThreshold: f
             else
                 if interaction.HasLight then
                     lightSample.eval <- lightSampler.Eval(ray.Origin, &interaction)
-                    let misWeight = pdfBSDF / (lightSample.eval.pdf + pdfBSDF)
-                    L <- L + misWeight * beta * lightSample.eval.L / lightSample.eval.pdf
+                    L <- L + beta * lightSample.eval.L * bsdfSample.eval.pdf / (bsdfSample.eval.pdf + lightSample.eval.pdf)
                 if interaction.HasMaterial then
                     lightSample <- lightSampler.Sample(interaction.Position, sampler.Next2D())
                     let shadowRay = interaction.SpawnRay(lightSample.wi)
@@ -37,12 +36,10 @@ type PathTracingIntegrator(spp: int, maxDepth: int, rrDepth: int, rrThreshold: f
                     let occluded = aggregate.Intersect(&shadowRay, lightDistance - 1e-3f)
                     if not occluded then
                         bsdfSample.eval <- interaction.EvalBSDF(-ray.Direction, lightSample.wi)
-                        let misWeight = lightSample.eval.pdf / (lightSample.eval.pdf + bsdfSample.eval.pdf)
-                        L <- L + misWeight * beta * bsdfSample.eval.bsdf * lightSample.eval.L / lightSample.eval.pdf
+                        L <- L + beta * bsdfSample.eval.bsdf * lightSample.eval.L / (lightSample.eval.pdf + bsdfSample.eval.pdf)
                     bsdfSample <- interaction.SampleBSDF(-ray.Direction, sampler.Next2D())
                     ray <- interaction.SpawnRay(bsdfSample.wi)
-                    pdfBSDF <- bsdfSample.eval.pdf
-                    beta <- beta * bsdfSample.eval.bsdf / pdfBSDF
+                    beta <- beta * bsdfSample.eval.bsdf / bsdfSample.eval.pdf
                     if depth >= this.RRDepth then
                         if sampler.Next1D() < this.RRThreshold then
                             beta <- beta / this.RRThreshold
