@@ -25,6 +25,7 @@
     <Compile Include="Extensions\Integrator\Normal.fs" />
     <Compile Include="Extensions\Integrator\Direct.fs" />
     <Compile Include="Extensions\Integrator\PathTracing.fs" />
+    <Compile Include="Extensions\Integrator\Metropolis.fs" />
     <Compile Include="Extensions\Material\Lambertian.fs" />
     <Compile Include="Extensions\LightSampler\Uniform.fs" />
     <Compile Include="Extensions\Aggregate\BVH.fs" />

@@ -25,8 +25,7 @@ type DirectIntegrator(spp: int) =
 
                 if not occluded then
                     let bsdfEval: BSDFEval = interaction.EvalBSDF(-ray.Direction, lightSample.wi)
-                    let misWeight = lightSample.eval.pdf / (lightSample.eval.pdf + bsdfEval.pdf)
-                    L <- L + misWeight * bsdfEval.bsdf * lightSample.eval.L / lightSample.eval.pdf
+                    L <- Vector3.FusedMultiplyAdd(bsdfEval.bsdf, lightSample.eval.L * (1f / lightSample.eval.pdf), L)
 
                 let bsdfSample = interaction.SampleBSDF(-ray.Direction, sampler.Next2D())
                 let ray = interaction.SpawnRay(bsdfSample.wi)
@@ -35,7 +34,6 @@ type DirectIntegrator(spp: int) =
 
                 if aggregate.Intersect(&ray, &interaction, &t) && interaction.HasLight then
                     let lightEval = lightSampler.Eval(ray.Origin, &interaction)
-                    let misWeight = bsdfSample.eval.pdf / (lightEval.pdf + bsdfSample.eval.pdf)
-                    L <- L + misWeight * bsdfSample.eval.bsdf * lightEval.L / bsdfSample.eval.pdf
+                    L <- Vector3.FusedMultiplyAdd(bsdfSample.eval.bsdf, lightEval.L * (1f / lightEval.pdf), L)
 
         L

@@ -2,6 +2,7 @@
 
 open System
 open System.Numerics
+open System.Threading
 open System.Threading.Tasks
 open System.IO
 
@@ -11,7 +12,7 @@ type ToneMapping =
     | Gamma
 
 type Film(resolution: int * int, toneMapping: ToneMapping) =
-    let mutable _pixels = Array.create (fst resolution * snd resolution) Vector3.Zero
+    member val Pixels = Array.zeroCreate<Vector3> (fst resolution * snd resolution) with get
 
     member this.ToneMapping = toneMapping
 
@@ -31,19 +32,25 @@ type Film(resolution: int * int, toneMapping: ToneMapping) =
     member this.ImageHeight = snd resolution
     member this.AspectRatio = float32 (fst resolution) / float32 (snd resolution)
     
-    member this.Clear() =
-        Parallel.For(0, _pixels.Length - 1, fun i -> _pixels[i] <- Vector3.Zero)
+    member inline this.Clear() =
+        Parallel.For(0, this.Pixels.Length - 1, fun i -> this.Pixels[i] <- Vector3.Zero) |> ignore
 
-    member this.SetPixel(pixelId: int * int, color: Vector3) =
+    member inline this.SetPixel(pixelId: int * int, color: Vector3) =
         let imageX, imageY = pixelId
-        _pixels[(this.ImageHeight - imageY - 1) * this.ImageWidth + imageX] <- color
+        let index = (this.ImageHeight - imageY - 1) * this.ImageWidth + imageX
+        this.Pixels[index] <- color
 
-    member this.Save(filename: string) =
+    member inline this.Accumulate(pixelId: int * int, color: Vector3) =
+        let imageX, imageY = pixelId
+        let index = (this.ImageHeight - imageY - 1) * this.ImageWidth + imageX
+        this.Pixels[index] <- this.Pixels[index] + color
+    
+    member inline this.Save(filename: string) =
         let toInt (x: float32) = int (255f * x + 0.5f)
         use file = File.CreateText filename
         file.Write $"P3\n{this.ImageWidth} {this.ImageHeight}\n255\n"
 
-        _pixels
+        this.Pixels
         |> Array.toSeq
         |> Seq.map this.PostProcess
         |> Seq.iter (fun x -> file.Write $"{toInt x.X} {toInt x.Y} {toInt x.Z} ")

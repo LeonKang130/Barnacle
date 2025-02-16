@@ -14,4 +14,6 @@ Although this renderer is not designed for actual real-time rendering, we would 
 - [x] Use BVH for acceleration
 - [ ] Support simple PBR material
 - [ ] Scene I/O & image/video output
-- [ ] ReSTIR DI/neural denoiser/bidirectional path tracing/...
+- [ ] ReSTIR DI
+- [x] Primary Sample Space Metropolis Light Transport
+- [ ] Stochastic Progressive Photon Mapping
