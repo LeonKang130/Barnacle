@@ -17,6 +17,7 @@
     <Compile Include="Base\LightSampler.fs" />
     <Compile Include="Base\Integrator.fs" />
     <Compile Include="Base\Scene.fs" />
+    <Compile Include="Base\AliasTable.fs" />
     <Compile Include="Extensions\Primitive\Sphere.fs" />
     <Compile Include="Extensions\Primitive\Mesh.fs" />
     <Compile Include="Extensions\Camera\Pinhole.fs" />

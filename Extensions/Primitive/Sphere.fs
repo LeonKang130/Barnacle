@@ -94,7 +94,7 @@ type SphereInstance(sphere: SpherePrimitive, material: MaterialBase option, ligh
 
     member this.Sphere = sphere
 
-    override this.Sample(uSurface: Vector2) =
+    override this.Sample(_, uSurface: Vector2) =
         let theta = 2f * MathF.PI * uSurface.X
         let phi = MathF.Acos(1f - 2f * uSurface.Y)
         let sinPhi = MathF.Sin(phi)

@@ -152,6 +152,13 @@ type MeshPrimitive(vertices: Vector3 array, indices: int array) =
         let p1 = this.Vertices[triangleIndex.I1]
         let p2 = this.Vertices[triangleIndex.I2]
         Triangle(p0, p1, p2)
+    
+    member val AliasTable =
+        let weights = Array.init triangleIndices.Length (fun i ->
+            let idx = triangleIndices[i]
+            let triangle = Triangle(vertices[idx.I0], vertices[idx.I1], vertices[idx.I2])
+            triangle.SurfaceArea)
+        AliasTable(weights) with get
 
     override this.Intersect(ray: Ray inref, t: float32) =
         let traversalStack = BLASTraversal.stackalloc<int> 128
@@ -256,19 +263,16 @@ type MeshInstance(mesh: MeshPrimitive, material: MaterialBase option, light: Lig
     new(mesh: MeshPrimitive, material: MaterialBase) = MeshInstance(mesh, Some material, None)
     new(mesh: MeshPrimitive, light: LightBase) = MeshInstance(mesh, None, Some light)
 
-    override this.Sample(uSurface: Vector2) =
-        let mutable uSurface = uSurface
-        uSurface.X <- uSurface.X * float32 this.Instance.TriangleCount
-        let i = min (this.Instance.TriangleCount - 1) (int uSurface.X)
-        uSurface.X <- uSurface.X - float32 i
+    override this.Sample(uSelect: float32, uSurface: Vector2) =
+        let i, pdfTriangle = this.Instance.AliasTable.Sample(uSelect)
         let mutable triangle = this.Instance.FetchTriangle(i)
         triangle <- Triangle.Transform(&triangle, this.ObjectToWorld)
         let mutable interaction = Unchecked.defaultof<Interaction>
-        let mutable geom, pdf = triangle.Sample(uSurface)
+        let mutable geom, pdfArea = triangle.Sample(uSurface)
         geom.tag <- i
         interaction.geom <- geom
         interaction.inst <- this
-        interaction, pdf / float32 this.Instance.TriangleCount
+        interaction, pdfTriangle * pdfArea
 
     override this.EvalPDF(interaction: Interaction inref) =
         let i = interaction.geom.tag

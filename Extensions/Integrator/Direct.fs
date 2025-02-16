@@ -18,7 +18,7 @@ type DirectIntegrator(spp: int) =
                 L <- L + interaction.EvalEmit(-ray.Direction)
 
             if interaction.HasMaterial then
-                let lightSample = lightSampler.Sample(interaction.Position, sampler.Next2D())
+                let lightSample = lightSampler.Sample(interaction.Position, sampler.Next1D(), sampler.Next2D())
                 let shadowRay = interaction.SpawnRay(lightSample.wi)
                 let lightDistance = (lightSample.eval.p - interaction.Position).Length()
                 let occluded = aggregate.Intersect(&shadowRay, lightDistance - 1e-3f)

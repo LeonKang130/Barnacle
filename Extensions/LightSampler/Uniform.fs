@@ -7,12 +7,11 @@ open System.Numerics
 type UniformLightSampler(primitiveInstances: PrimitiveInstance array) =
     inherit LightSamplerBase(primitiveInstances)
 
-    override this.Sample(p: Vector3, uLight: Vector2) =
-        let mutable uLight = uLight
-        uLight.X <- uLight.X * float32 this.Instances.Length
-        let primitiveId = min (int uLight.X) (this.Instances.Length - 1)
-        uLight.X <- uLight.X - float32 primitiveId
-        let interaction, pdfSurface = this.Instances[primitiveId].Sample(uLight)
+    override this.Sample(p: Vector3, uSelect: float32, uLight: Vector2) =
+        let mutable uSelect = uSelect * float32 this.Instances.Length
+        let primitiveId = min (int uSelect) (this.Instances.Length - 1)
+        uSelect <- uSelect - float32 primitiveId
+        let interaction, pdfSurface = this.Instances[primitiveId].Sample(uSelect, uLight)
         let wo = Vector3.Normalize(p - interaction.Position)
         let cosWo = Vector3.Dot(interaction.Normal, wo)
         let dist2 = (p - interaction.Position).LengthSquared()

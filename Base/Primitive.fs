@@ -191,7 +191,7 @@ and [<AbstractClass>] PrimitiveInstance
         this.Bounds <-
             AxisAlignedBoundingBox.Transform(this.Primitive.Bounds, objectToWorld)
     
-    abstract member Sample: Vector2 -> Interaction * float32
+    abstract member Sample: float32 * Vector2 -> Interaction * float32
     abstract member EvalPDF: Interaction inref -> float32
 
 [<AbstractClass>]

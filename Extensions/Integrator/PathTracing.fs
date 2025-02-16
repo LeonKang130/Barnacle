@@ -30,7 +30,7 @@ type PathTracingIntegrator(spp: int, maxDepth: int, rrDepth: int, rrThreshold: f
                     lightSample.eval <- lightSampler.Eval(ray.Origin, &interaction)
                     L <- L + beta * lightSample.eval.L * bsdfSample.eval.pdf / (bsdfSample.eval.pdf + lightSample.eval.pdf)
                 if interaction.HasMaterial then
-                    lightSample <- lightSampler.Sample(interaction.Position, sampler.Next2D())
+                    lightSample <- lightSampler.Sample(interaction.Position, sampler.Next1D(), sampler.Next2D())
                     let shadowRay = interaction.SpawnRay(lightSample.wi)
                     let lightDistance = (lightSample.eval.p - interaction.Position).Length()
                     let occluded = aggregate.Intersect(&shadowRay, lightDistance - 1e-3f)
