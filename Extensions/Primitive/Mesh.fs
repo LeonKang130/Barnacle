@@ -1,11 +1,13 @@
 ﻿#nowarn "9"
 namespace Barnacle.Extensions.Primitive
 
-open System.Runtime.CompilerServices
+
 open Barnacle.Base
 open System
 open System.Numerics
 open System.IO
+open System.Runtime.CompilerServices
+open System.Runtime.InteropServices
 open Microsoft.FSharp.NativeInterop
 
 [<IsReadOnly; Struct>]
@@ -114,10 +116,20 @@ type TriangleIndex(i0: int, i1: int, i2: int) =
     member this.I2 = i2
 
 module private BLASTraversal =
-    let inline stackalloc<'a when 'a: unmanaged> (length: int) : Span<'a> =
-        let p = NativePtr.stackalloc<'a> length |> NativePtr.toVoidPtr
-        Span<'a>(p, length)
+    let inline stackalloc<'a when 'a: unmanaged> (length: int) : 'a byref =
+        let p = NativePtr.stackalloc<'a> length
+        NativePtr.toByRef p
+    
+    let inline stackPush<'a when 'a: unmanaged> (stack: 'a byref, stackTop: int byref, value: 'a) =
+        let stackTopElement = &Unsafe.Add(&stack, stackTop)
+        stackTopElement <- value
+        stackTop <- stackTop + 1
+    
+    let inline stackPop<'a when 'a: unmanaged> (stack: 'a byref, stackTop: int byref) : 'a =
+        stackTop <- stackTop - 1
+        Unsafe.Add(&stack, stackTop)
 
+[<Sealed>]
 type MeshPrimitive(vertices: Vector3 array, indices: int array) =
     inherit ElementalPrimitive()
 
@@ -147,10 +159,12 @@ type MeshPrimitive(vertices: Vector3 array, indices: int array) =
     member this.TriangleCount = this.TriangleIndices.Length
 
     member inline internal this.FetchTriangle(i: int) =
-        let triangleIndex = this.TriangleIndices[i]
-        let p0 = this.Vertices[triangleIndex.I0]
-        let p1 = this.Vertices[triangleIndex.I1]
-        let p2 = this.Vertices[triangleIndex.I2]
+        let triangleIndices = &MemoryMarshal.GetArrayDataReference this.TriangleIndices
+        let triangleIndex = Unsafe.Add(&triangleIndices, i)
+        let vertices = &MemoryMarshal.GetArrayDataReference this.Vertices
+        let p0 = &Unsafe.Add(&vertices, triangleIndex.I0)
+        let p1 = &Unsafe.Add(&vertices, triangleIndex.I1)
+        let p2 = &Unsafe.Add(&vertices, triangleIndex.I2)
         Triangle(p0, p1, p2)
     
     member val AliasTable =
@@ -161,14 +175,13 @@ type MeshPrimitive(vertices: Vector3 array, indices: int array) =
         AliasTable(weights) with get
 
     override this.Intersect(ray: Ray inref, t: float32) =
-        let traversalStack = BLASTraversal.stackalloc<int> 128
-        traversalStack[0] <- 0
+        let traversalStack = &BLASTraversal.stackalloc<int> 128
         let mutable stackTop = 1
+        BLASTraversal.stackPush(&traversalStack, &stackTop, 0)
         let mutable hit = false
 
         while not hit && stackTop <> 0 do
-            stackTop <- stackTop - 1
-            let i = traversalStack[stackTop]
+            let i = BLASTraversal.stackPop(&traversalStack, &stackTop)
             let node = this.BVHNodes[i]
 
             if node.Bounds.Intersect(&ray, t) then
@@ -181,25 +194,22 @@ type MeshPrimitive(vertices: Vector3 array, indices: int array) =
                         instanceId <- instanceId + 1
                 else
                     if ray.Direction[node.SplitAxis] > 0f then
-                        traversalStack[stackTop] <- node.RightChild
-                        traversalStack[stackTop + 1] <- i + 1
+                        BLASTraversal.stackPush(&traversalStack, &stackTop, node.RightChild)
+                        BLASTraversal.stackPush(&traversalStack, &stackTop, i + 1)
                     else
-                        traversalStack[stackTop] <- i + 1
-                        traversalStack[stackTop + 1] <- node.RightChild
-
-                    stackTop <- stackTop + 2
+                        BLASTraversal.stackPush(&traversalStack, &stackTop, i + 1)
+                        BLASTraversal.stackPush(&traversalStack, &stackTop, node.RightChild)
 
         hit
 
     override this.Intersect(ray: Ray inref, geom: LocalGeometry outref, t: float32 byref) =
-        let traversalStack = BLASTraversal.stackalloc<int> 128
-        traversalStack[0] <- 0
-        let mutable stackTop = 1
+        let traversalStack = &BLASTraversal.stackalloc<int> 128
+        let mutable stackTop = 0
+        BLASTraversal.stackPush(&traversalStack, &stackTop, 0)
         let mutable hit = false
 
         while stackTop <> 0 do
-            stackTop <- stackTop - 1
-            let i = traversalStack[stackTop]
+            let i = BLASTraversal.stackPop(&traversalStack, &stackTop)
             let node = this.BVHNodes[i]
 
             if node.Bounds.Intersect(&ray, t) then
@@ -209,13 +219,11 @@ type MeshPrimitive(vertices: Vector3 array, indices: int array) =
                         hit <- triangle.Intersect(&ray, &geom, &t) || hit
                 else
                     if ray.Direction[node.SplitAxis] > 0f then
-                        traversalStack[stackTop] <- node.RightChild
-                        traversalStack[stackTop + 1] <- i + 1
+                        BLASTraversal.stackPush(&traversalStack, &stackTop, node.RightChild)
+                        BLASTraversal.stackPush(&traversalStack, &stackTop, i + 1)
                     else
-                        traversalStack[stackTop] <- i + 1
-                        traversalStack[stackTop + 1] <- node.RightChild
-
-                    stackTop <- stackTop + 2
+                        BLASTraversal.stackPush(&traversalStack, &stackTop, i + 1)
+                        BLASTraversal.stackPush(&traversalStack, &stackTop, node.RightChild)
 
         hit
 
@@ -256,6 +264,7 @@ type MeshPrimitive(vertices: Vector3 array, indices: int array) =
 
         MeshPrimitive(vertices.ToArray(), indices.ToArray())
 
+[<Sealed>]
 type MeshInstance(mesh: MeshPrimitive, material: MaterialBase option, light: LightBase option) =
     inherit PrimitiveInstance(mesh, material, light)
     member this.Instance = mesh

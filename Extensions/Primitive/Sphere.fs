@@ -4,6 +4,7 @@ open Barnacle.Base
 open System
 open System.Numerics
 
+[<Sealed>]
 type SpherePrimitive(radius: float32) =
     inherit ElementalPrimitive()
     new() = SpherePrimitive(1f)
@@ -80,6 +81,7 @@ type SpherePrimitive(radius: float32) =
     
     override this.Bounds = AxisAlignedBoundingBox(Vector3(-this.Radius), Vector3(this.Radius))
 
+[<Sealed>]
 type SphereInstance(sphere: SpherePrimitive, material: MaterialBase option, light: LightBase option) =
     inherit PrimitiveInstance(sphere, material, light)
 
@@ -95,12 +97,12 @@ type SphereInstance(sphere: SpherePrimitive, material: MaterialBase option, ligh
     member this.Sphere = sphere
 
     override this.Sample(_, uSurface: Vector2) =
-        let theta = 2f * MathF.PI * uSurface.X
-        let phi = MathF.Acos(1f - 2f * uSurface.Y)
-        let sinPhi = MathF.Sin(phi)
+        let struct (sinTheta, cosTheta) = MathF.SinCos(2f * MathF.PI * uSurface.X)
+        let cosPhi = 1f - 2f * uSurface.Y
+        let sinPhi = MathF.Sqrt(1f - cosPhi * cosPhi)
 
         let n =
-            Vector3(MathF.Cos(theta) * sinPhi, MathF.Sin(theta) * sinPhi, MathF.Cos(phi))
+            Vector3(cosTheta * sinPhi, sinTheta * sinPhi, cosPhi)
 
         let mutable interaction = Unchecked.defaultof<Interaction>
         interaction.geom <- LocalGeometry(n * this.Sphere.Radius, n, uSurface)

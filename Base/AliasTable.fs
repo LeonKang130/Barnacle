@@ -1,16 +1,18 @@
 ﻿namespace Barnacle.Base
 
 open System.Collections.Generic
+open System.Runtime.CompilerServices
+open System.Runtime.InteropServices
 
-[<Struct>]
-type private Entry = {
+[<Struct; NoComparison; NoEquality>]
+type Entry = {
     mutable alias: int
     mutable prob: float32
     mutable pdf: float32
 }
 
 type AliasTable(weights: float32 array) =
-    member val private Table =
+    member val Table =
         let sum = Array.sum weights
         if sum = 0f then
             Array.init weights.Length (fun i -> { prob = 1f; alias = i; pdf = 1f / float32 weights.Length })
@@ -47,12 +49,14 @@ type AliasTable(weights: float32 array) =
                 table[u].alias <- u
                 table[u].prob <- 1f
             table with get
-    member this.Sample(u: float32) =
+    member inline this.Sample(u: float32) =
+        let mutable table = &MemoryMarshal.GetArrayDataReference this.Table
         let mutable u = u * float32 this.Table.Length
         let idx = int u
-        let entry = this.Table[idx]
+        let entry = Unsafe.Add(&table, idx)
         u <- u - float32 idx
         if u < entry.prob then
             idx, entry.pdf
         else
-            entry.alias, this.Table[entry.alias].pdf
+            let idx = entry.alias
+            idx, Unsafe.Add(&table, idx).pdf

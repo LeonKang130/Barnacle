@@ -3,12 +3,21 @@ namespace Barnacle.Extensions.Aggregate
 
 open Barnacle.Base
 open System
+open System.Runtime.CompilerServices
 open Microsoft.FSharp.NativeInterop
 
 module private TLASTraversal =
-    let inline stackalloc<'a when 'a: unmanaged> (length: int): Span<'a> =
-        let p = NativePtr.stackalloc<'a> length |> NativePtr.toVoidPtr
-        Span<'a>(p, length)
+    let inline stackalloc<'a when 'a: unmanaged> (length: int): 'a byref =
+        let p = NativePtr.stackalloc<'a> length
+        NativePtr.toByRef p
+    let inline stackPush<'a when 'a: unmanaged> (stack: 'a byref, stackTop: int byref, value: 'a) =
+        let stackTopElement = &Unsafe.Add(&stack, stackTop)
+        stackTopElement <- value
+        stackTop <- stackTop + 1
+    
+    let inline stackPop<'a when 'a: unmanaged> (stack: 'a byref, stackTop: int byref) : 'a =
+        stackTop <- stackTop - 1
+        Unsafe.Add(&stack, stackTop)
 
 type BVHAggregate(instances: PrimitiveInstance array) =
     inherit PrimitiveAggregate()
@@ -18,13 +27,12 @@ type BVHAggregate(instances: PrimitiveInstance array) =
             failwith "BVH depth potentially exceeds 128"
         builder.Build(instances.AsSpan(), _.Bounds) with get
     override this.Intersect(ray: Ray inref, t: float32) =
-        let traversalStack = TLASTraversal.stackalloc<int> 128
-        traversalStack[0] <- 0
-        let mutable stackTop = 1
+        let traversalStack = &TLASTraversal.stackalloc<int> 128
+        let mutable stackTop = 0
+        TLASTraversal.stackPush(&traversalStack, &stackTop, 0)
         let mutable hit = false
         while not hit && stackTop <> 0 do
-            stackTop <- stackTop - 1
-            let i = traversalStack[stackTop]
+            let i = TLASTraversal.stackPop(&traversalStack, &stackTop)
             let node = this.BVHNodes[i]
             if node.Bounds.Intersect(&ray, t) then
                 if node.IsLeaf then
@@ -34,21 +42,19 @@ type BVHAggregate(instances: PrimitiveInstance array) =
                         instanceId <- instanceId + 1
                 else
                     if ray.Direction[node.SplitAxis] > 0f then
-                        traversalStack[stackTop] <- node.RightChild
-                        traversalStack[stackTop + 1] <- i + 1
+                        TLASTraversal.stackPush(&traversalStack, &stackTop, node.RightChild)
+                        TLASTraversal.stackPush(&traversalStack, &stackTop, i + 1)
                     else
-                        traversalStack[stackTop] <- i + 1
-                        traversalStack[stackTop + 1] <- node.RightChild
-                    stackTop <- stackTop + 2
+                        TLASTraversal.stackPush(&traversalStack, &stackTop, i + 1)
+                        TLASTraversal.stackPush(&traversalStack, &stackTop, node.RightChild)
         hit
     override this.Intersect(ray: Ray inref, interaction: Interaction outref, t: float32 byref) =
-        let traversalStack = TLASTraversal.stackalloc<int> 128
-        traversalStack[0] <- 0
-        let mutable stackTop = 1
+        let traversalStack = &TLASTraversal.stackalloc<int> 128
+        let mutable stackTop = 0
+        TLASTraversal.stackPush(&traversalStack, &stackTop, 0)
         let mutable hit = false
         while stackTop <> 0 do
-            stackTop <- stackTop - 1
-            let i = traversalStack[stackTop]
+            let i = TLASTraversal.stackPop(&traversalStack, &stackTop)
             let node = this.BVHNodes[i]
             if node.Bounds.Intersect(&ray, t) then
                 if node.IsLeaf then
@@ -56,10 +62,9 @@ type BVHAggregate(instances: PrimitiveInstance array) =
                         hit <- instances[instanceId].Intersect(&ray, &interaction, &t) || hit
                 else
                     if ray.Direction[node.SplitAxis] > 0f then
-                        traversalStack[stackTop] <- node.RightChild
-                        traversalStack[stackTop + 1] <- i + 1
+                        TLASTraversal.stackPush(&traversalStack, &stackTop, node.RightChild)
+                        TLASTraversal.stackPush(&traversalStack, &stackTop, i + 1)
                     else
-                        traversalStack[stackTop] <- i + 1
-                        traversalStack[stackTop + 1] <- node.RightChild
-                    stackTop <- stackTop + 2
+                        TLASTraversal.stackPush(&traversalStack, &stackTop, i + 1)
+                        TLASTraversal.stackPush(&traversalStack, &stackTop, node.RightChild)
         hit

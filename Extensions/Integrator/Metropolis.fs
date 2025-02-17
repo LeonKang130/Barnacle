@@ -1,10 +1,8 @@
 ﻿namespace Barnacle.Extensions.Integrator
 
-open System.Runtime.CompilerServices
 open Barnacle.Base
 open System
 open System.Numerics
-open System.Threading.Tasks
 
 [<Struct>]
 type PrimarySample =
@@ -26,14 +24,14 @@ type MLTSampler =
     val mutable Sampler: Sampler
     val LargeStepProb: float32
     val Sigma: float32
-    val Xs: ResizeArray<PrimarySample>
+    val mutable Xs: ResizeArray<PrimarySample>
     val mutable SampleIndex: int
     val mutable LastLargeStepIteration: uint
     val mutable LargeStep: bool
     val mutable CurrentIteration: uint
 
-    new(seed: uint, largeStepProb: float32, sigma: float32) =
-        { Sampler = Sampler(seed)
+    new(sampler: Sampler, largeStepProb: float32, sigma: float32) =
+        { Sampler = sampler
           LargeStepProb = largeStepProb
           Sigma = sigma
           Xs = ResizeArray()
@@ -55,7 +53,7 @@ type MLTSampler =
     member inline this.EnsureReady(index: int) =
         let inline ErfInv (x: float32) =
             let mutable x = MathF.Min(MathF.Max(x, -0.99999f), 0.99999f)
-            let mutable w = MathF.Log((1f - x) * (1f + x))
+            let mutable w = MathF.Log(MathF.FusedMultiplyAdd(-x, x, 1f))
 
             if w < 5f then
                 w <- w - 2.5f
@@ -95,22 +93,21 @@ type MLTSampler =
             if this.LargeStep then
                 this.Sampler.Next1D()
             else
-                let normalSample = MathF.Sqrt(2f) * ErfInv(2f * this.Sampler.Next1D() - 1f)
+                let normalSample = MathF.Sqrt(2f) * ErfInv(MathF.FusedMultiplyAdd(2f, this.Sampler.Next1D(), -1f))
 
                 let effectiveSigma =
                     this.Sigma
                     * MathF.Sqrt(float32 (this.CurrentIteration - this.LastLargeStepIteration))
 
-                let value = x.value + normalSample * effectiveSigma
+                let value = MathF.FusedMultiplyAdd(normalSample, effectiveSigma, x.value)
                 value - MathF.Floor(value)
 
         x.lastModification <- this.CurrentIteration
         this.Xs[index] <- x
+        x.value
 
     member inline this.Next1D() =
-        let index = this.GetNextIndex()
-        this.EnsureReady(index)
-        this.Xs[index].value
+        this.EnsureReady(this.GetNextIndex())
 
     member inline this.Next2D() = Vector2(this.Next1D(), this.Next1D())
 
@@ -124,19 +121,11 @@ type MLTSampler =
         if this.LargeStep then
             this.LastLargeStepIteration <- this.CurrentIteration
 
-[<IsReadOnly; Struct>]
-type MLTPathSample =
-    { imageX: int
-      imageY: int
-      L: Vector3
-      y: float32 }
-
-    member this.PixelId = this.imageX, this.imageY
-
+[<Sealed>]
 type MetropolisIntegrator
     (maxDepth: int, nBootstrap: int, nChains: int, mutationPerPixel: int, sigma: float32, largeStepProb: float32) =
     inherit ProgressiveIntegrator(mutationPerPixel)
-    new(mutationPerPixel: int) = MetropolisIntegrator(8, 1024 * 1024, 256 * 1024, mutationPerPixel, 1e-4f, 0.3f)
+    new(mutationPerPixel: int) = MetropolisIntegrator(8, 4096 * 1024, 256 * 1024, mutationPerPixel, 1e-4f, 0.3f)
     member this.MaxDepth = maxDepth
     member this.RRDepth = 5
     member this.RRThreshold = 0.95f
@@ -144,24 +133,13 @@ type MetropolisIntegrator
     member this.NChains = nChains
     member this.Sigma = sigma
     member this.LargeStepProb = largeStepProb
+    member val BootstrapWeights = ResizeArray<float32>()
 
     member inline this.Li
-        (
-            camera: CameraBase,
-            film: Film,
-            aggregate: PrimitiveAggregate,
-            lightSampler: LightSamplerBase,
-            sampler: MLTSampler byref
-        ) : MLTPathSample =
-        let imageWidth, imageHeight = film.Resolution
-        let imageX = sampler.Next1D() * float32 imageWidth |> int |> min (imageWidth - 1)
-        let imageY = sampler.Next1D() * float32 imageHeight |> int |> min (imageHeight - 1)
-
-        let mutable ray, pdf =
-            camera.GeneratePrimaryRay(film.Resolution, (imageX, imageY), sampler.Next2D(), sampler.Next2D())
-
+        (ray: Ray inref, aggregate: PrimitiveAggregate, lightSampler: LightSamplerBase, sampler: MLTSampler byref) =
+        let mutable ray = ray
         let mutable L = Vector3.Zero
-        let mutable beta = Vector3(1f / pdf)
+        let mutable beta = Vector3.One
         let mutable depth = 0
         let mutable interaction = Unchecked.defaultof<Interaction>
         let mutable t = Unchecked.defaultof<float32>
@@ -184,85 +162,87 @@ type MetropolisIntegrator
                     lightSample <- lightSampler.Sample(interaction.Position, sampler.Next1D(), sampler.Next2D())
                     let shadowRay = interaction.SpawnRay(lightSample.wi)
                     let lightDistance = (lightSample.eval.p - interaction.Position).Length()
-                    let occluded = aggregate.Intersect(&shadowRay, lightDistance - 1e-3f)
 
-                    if not occluded then
+                    if lightSample.eval.pdf <> 0f && not (aggregate.Intersect(&shadowRay, lightDistance - 1e-3f)) then
                         bsdfSample.eval <- interaction.EvalBSDF(-ray.Direction, lightSample.wi)
 
                         L <- Vector3.FusedMultiplyAdd(beta * bsdfSample.eval.bsdf,
                             lightSample.eval.L * (1f / (bsdfSample.eval.pdf + lightSample.eval.pdf)), L)
 
                     bsdfSample <- interaction.SampleBSDF(-ray.Direction, sampler.Next2D())
-                    ray <- interaction.SpawnRay(bsdfSample.wi)
-                    beta <- beta * bsdfSample.eval.bsdf / bsdfSample.eval.pdf
+                    if bsdfSample.eval.pdf = 0f then
+                        depth <- this.MaxDepth
+                    else
+                        ray <- interaction.SpawnRay(bsdfSample.wi)
+                        beta <- beta * bsdfSample.eval.bsdf / bsdfSample.eval.pdf
 
-                    if depth >= this.RRDepth then
-                        if sampler.Next1D() < this.RRThreshold then
-                            beta <- beta / this.RRThreshold
-                        else
-                            depth <- this.MaxDepth
+                        if depth >= this.RRDepth then
+                            if sampler.Next1D() < this.RRThreshold then
+                                beta <- beta / this.RRThreshold
+                            else
+                                depth <- this.MaxDepth
 
-                    depth <- depth + 1
+                        depth <- depth + 1
                 else
                     depth <- this.MaxDepth
-
-        if Single.IsNaN L.X then L.X <- 0f
-        if Single.IsNaN L.Y then L.Y <- 0f
-        if Single.IsNaN L.Z then L.Z <- 0f
         
-        { imageX = imageX
-          imageY = imageY
-          L = L
-          y = Vector3.Dot(Vector3(0.21f, 0.71f, 0.07f), Vector3.Clamp(L, Vector3.Zero, Vector3.One)) }
-
-    override this.Render
-        (camera: CameraBase, film: Film, aggregate: PrimitiveAggregate, lightSampler: LightSamplerBase)
-        =
-        let imageWidth, imageHeight = film.Resolution
-        let bootstrapWeights = Array.zeroCreate<float32> this.NBootstrap
-
-        let inline bootstrapSingleChain (bootstrapId: int) =
-            let mutable sampler = MLTSampler(uint bootstrapId, this.LargeStepProb, this.Sigma)
-            bootstrapWeights[bootstrapId] <- this.Li(camera, film, aggregate, lightSampler, &sampler).y
-
-        Parallel.For(0, this.NBootstrap, bootstrapSingleChain) |> ignore
-        let b = (Array.sum bootstrapWeights) / float32 this.NBootstrap
+        L
+        
+    override this.RenderTile(tx: int, ty: int, camera: CameraBase, film: Film, aggregate: PrimitiveAggregate, lightSampler: LightSamplerBase) =
+        let struct (imageWidth, imageHeight) = film.Resolution
+        let tileXFirst = tx * this.TileSize
+        let tileYFirst = ty * this.TileSize
+        let tileXLast = min ((tx + 1) * this.TileSize) film.ImageWidth
+        let tileYLast = min ((ty + 1) * this.TileSize) film.ImageHeight
+        let tileWidth = tileXLast - tileXFirst
+        let tileHeight = tileYLast - tileYFirst
+        let tileSize = uint64 (tileWidth * tileHeight)
+        let imageSize = uint64 (imageWidth * imageHeight)
+        let nBootstrapPerTile = int ((uint64 this.NBootstrap * tileSize + imageSize - 1uL) / imageSize)
+        let nChainsPerTile = int ((uint64 this.NChains * tileSize + imageSize - 1uL) / imageSize)
+        let mutationsPerChain = int ((uint64 this.SamplePerPixel * tileSize + uint64 nChainsPerTile - 1UL) / uint64 nChainsPerTile)
+        let effectiveSamplePerPixel = float32 (mutationsPerChain * nChainsPerTile) / float32 (tileWidth * tileHeight)
+        let bootstrapWeights = Array.zeroCreate<float32> nBootstrapPerTile
+        let mutable mltSampler = Unchecked.defaultof<MLTSampler>
+        for bootstrapId = 0 to nBootstrapPerTile - 1 do
+            mltSampler <- MLTSampler(Sampler(uint (bootstrapId + nBootstrapPerTile * this.FrameId), uint tx, uint ty), this.LargeStepProb, this.Sigma)
+            let imageX = min (tileXLast - 1) (int (mltSampler.Next1D() * float32 tileWidth) + tileXFirst)
+            let imageY = min (tileYLast - 1) (int (mltSampler.Next1D() * float32 tileHeight) + tileYFirst)
+            let struct (ray, pdf) = camera.GeneratePrimaryRay(film.Resolution, (imageX, imageY), mltSampler.Next2D(), mltSampler.Next2D())
+            let L = Vector3.Clamp(this.Li(&ray, aggregate, lightSampler, &mltSampler) * (1f / pdf), Vector3.Zero, Vector3.One)
+            bootstrapWeights[bootstrapId] <- L.X + L.Y + L.Z
+        let invB = float32 nBootstrapPerTile / (Array.sum bootstrapWeights)
         let bootstrapSamplingTable = AliasTable(bootstrapWeights)
-
-        let mutationsPerChain =
-            (this.SamplePerPixel * (imageWidth * imageHeight) + this.NChains - 1)
-            / this.NChains
-
-        let effectiveSPP =
-            float32 (mutationsPerChain * this.NChains) / float32 (imageWidth * imageHeight)
-
-        let inline renderChain (chainId: int) =
-            let mutable sampler = Sampler(uint chainId, 0x12345678u)
-            let bootstrapIndex, _ = bootstrapSamplingTable.Sample(sampler.Next1D())
-
-            let mutable mltSampler =
-                MLTSampler(uint bootstrapIndex, this.LargeStepProb, this.Sigma)
-
-            let mutable s = this.Li(camera, film, aggregate, lightSampler, &mltSampler)
-            let mutable sNew = Unchecked.defaultof<MLTPathSample>
-
+        for chainId = 0 to nChainsPerTile - 1 do
+            let mutable sampler = Sampler(uint (chainId + nChainsPerTile * this.FrameId), uint tx, uint ty)
+            let bootstrapId, _ = bootstrapSamplingTable.Sample(sampler.Next1D())
+            mltSampler <- MLTSampler(Sampler(uint (bootstrapId + nBootstrapPerTile * this.FrameId), uint tx, uint ty), this.LargeStepProb, this.Sigma)
+            let mutable imageX = min (tileXLast - 1) (int (mltSampler.Next1D() * float32 tileWidth) + tileXFirst)
+            let mutable imageY = min (tileYLast - 1) (int (mltSampler.Next1D() * float32 tileHeight) + tileYFirst)
+            let struct (ray, pdf) = camera.GeneratePrimaryRay(film.Resolution, (imageX, imageY), mltSampler.Next2D(), mltSampler.Next2D())
+            let mutable L = this.Li(&ray, aggregate, lightSampler, &mltSampler) * (1f / pdf)
+            let mutable y = Vector3.Dot(Vector3.One, Vector3.Clamp(L, Vector3.Zero, Vector3.One))
             for j = 0 to mutationsPerChain - 1 do
                 mltSampler.StartIteration()
-                sNew <- this.Li(camera, film, aggregate, lightSampler, &mltSampler)
-                let accept = MathF.Min(1f, sNew.y / s.y)
-                let wOld = (1f - accept) / (s.y / b + this.LargeStepProb)
-                film.Accumulate(s.PixelId, (wOld / effectiveSPP) * s.L)
-
+                let imageXNew = min (tileXLast - 1) (int (mltSampler.Next1D() * float32 tileWidth) + tileXFirst)
+                let imageYNew = min (tileYLast - 1) (int (mltSampler.Next1D() * float32 tileHeight) + tileYFirst)
+                let struct (ray, pdf) = camera.GeneratePrimaryRay(film.Resolution, (imageXNew, imageYNew), mltSampler.Next2D(), mltSampler.Next2D())
+                let LNew = this.Li(&ray, aggregate, lightSampler, &mltSampler) * (1f / pdf)
+                let yNew = Vector3.Dot(Vector3.One, Vector3.Clamp(LNew, Vector3.Zero, Vector3.One))
+                let accept = MathF.Min(1f, yNew / y)
+                let wOld = (1f - accept) / Single.FusedMultiplyAdd(y, invB, this.LargeStepProb)
+                film.Accumulate((imageX, imageY), (wOld / effectiveSamplePerPixel) * L)
                 let wNew =
-                    (accept + if mltSampler.LargeStep then 1f else 0f)
-                    / (sNew.y / b + this.LargeStepProb)
-
-                film.Accumulate(sNew.PixelId, (wNew / effectiveSPP) * sNew.L)
-
+                    if mltSampler.LargeStep then
+                        (accept + 1f) / Single.FusedMultiplyAdd(yNew, invB, this.LargeStepProb)
+                    else
+                        accept / Single.FusedMultiplyAdd(yNew, invB, this.LargeStepProb)
+                film.Accumulate((imageXNew, imageYNew), (wNew / effectiveSamplePerPixel) * LNew)
                 if sampler.Next1D() < accept then
-                    s <- sNew
+                    imageX <- imageXNew
+                    imageY <- imageYNew
+                    L <- LNew
+                    y <- yNew
                     mltSampler.Accept()
                 else
                     mltSampler.Reject()
-
-        Parallel.For(0, this.NChains, renderChain) |> ignore

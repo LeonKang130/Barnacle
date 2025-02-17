@@ -12,13 +12,12 @@ type IntegratorBase() =
 [<AbstractClass>]
 type ProgressiveIntegrator(spp: int, tileSize: int) =
     inherit IntegratorBase()
-    let mutable _frameId = 0
-    new(spp: int) = ProgressiveIntegrator(spp, 16)
-    member this.SamplePerPixel = spp
-    member this.TileSize = tileSize
+    new(spp: int) = ProgressiveIntegrator(spp, 32)
+    member val FrameId = 0 with get, set
+    member val SamplePerPixel = spp with get
+    member val TileSize = tileSize with get
     override this.Li(_, _, _, _) = Vector3.Zero
     abstract member RenderTile: int * int * CameraBase * Film * PrimitiveAggregate * LightSamplerBase -> unit
-
     default this.RenderTile
         (tx: int, ty: int, camera: CameraBase, film: Film, aggregate: PrimitiveAggregate, lightSampler: LightSamplerBase) =
         let tileXFirst = tx * this.TileSize
@@ -32,29 +31,19 @@ type ProgressiveIntegrator(spp: int, tileSize: int) =
 
                 for sampleId = 0 to this.SamplePerPixel - 1 do
                     let mutable sampler =
-                        Sampler(uint x, uint y, uint (_frameId * this.SamplePerPixel + sampleId))
+                        Sampler(uint x, uint y, uint (this.FrameId * this.SamplePerPixel + sampleId))
 
-                    let ray, pdf =
+                    let struct (ray, pdf) =
                         camera.GeneratePrimaryRay(film.Resolution, (x, y), sampler.Next2D(), sampler.Next2D())
 
-                    let mutable radiance = this.Li(&ray, aggregate, lightSampler, &sampler) / pdf
-                    if Single.IsNaN radiance.X then radiance.X <- 0f
-                    if Single.IsNaN radiance.Y then radiance.Y <- 0f
-                    if Single.IsNaN radiance.Z then radiance.Z <- 0f
+                    let radiance = this.Li(&ray, aggregate, lightSampler, &sampler) / pdf
                     accum <- accum + (1f / float32 this.SamplePerPixel) * radiance
 
                 film.SetPixel((x, y), accum)
 
     override this.Render(camera: CameraBase, film: Film, aggregate: PrimitiveAggregate, lightSampler: LightSamplerBase) =
-        seq {
-            let tileXCount = (film.ImageWidth + this.TileSize - 1) / this.TileSize
-            let tileYCount = (film.ImageHeight + this.TileSize - 1) / this.TileSize
-
-            for tx = 0 to tileXCount - 1 do
-                for ty = 0 to tileYCount - 1 do
-                    yield Task.Run(fun () -> this.RenderTile(tx, ty, camera, film, aggregate, lightSampler))
-        }
-        |> Seq.toArray
-        |> Task.WaitAll
-
-        _frameId <- _frameId + 1
+        let tileXCount = (film.ImageWidth + this.TileSize - 1) / this.TileSize
+        let tileYCount = (film.ImageHeight + this.TileSize - 1) / this.TileSize
+        Parallel.For(0, tileXCount * tileYCount, fun tileIdx ->
+            this.RenderTile(tileIdx % tileXCount, tileIdx / tileXCount, camera, film, aggregate, lightSampler)) |> ignore
+        this.FrameId <- this.FrameId + 1

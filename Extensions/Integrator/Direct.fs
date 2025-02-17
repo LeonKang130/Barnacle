@@ -3,11 +3,11 @@
 open Barnacle.Base
 open System.Numerics
 
+[<Sealed>]
 type DirectIntegrator(spp: int) =
     inherit ProgressiveIntegrator(spp)
 
-    override this.Li
-        (ray: Ray inref, aggregate: PrimitiveAggregate, lightSampler: LightSamplerBase, sampler: Sampler byref)
+    override this.Li(ray: Ray inref, aggregate: PrimitiveAggregate, lightSampler: LightSamplerBase, sampler: Sampler byref)
         =
         let mutable t = infinityf
         let mutable interaction = Unchecked.defaultof<Interaction>

@@ -3,7 +3,10 @@
 open Barnacle.Base
 open System
 open System.Numerics
+open System.Runtime.InteropServices
+open System.Runtime.CompilerServices
 
+[<Sealed>]
 type UniformLightSampler(primitiveInstances: PrimitiveInstance array) =
     inherit LightSamplerBase(primitiveInstances)
 
@@ -11,7 +14,8 @@ type UniformLightSampler(primitiveInstances: PrimitiveInstance array) =
         let mutable uSelect = uSelect * float32 this.Instances.Length
         let primitiveId = min (int uSelect) (this.Instances.Length - 1)
         uSelect <- uSelect - float32 primitiveId
-        let interaction, pdfSurface = this.Instances[primitiveId].Sample(uSelect, uLight)
+        let interaction, pdfSurface =
+            Unsafe.Add(&MemoryMarshal.GetArrayDataReference this.Instances, primitiveId).Sample(uSelect, uLight)
         let wo = Vector3.Normalize(p - interaction.Position)
         let cosWo = Vector3.Dot(interaction.Normal, wo)
         let dist2 = (p - interaction.Position).LengthSquared()

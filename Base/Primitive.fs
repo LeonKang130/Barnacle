@@ -199,6 +199,7 @@ type PrimitiveAggregate() =
     abstract member Intersect: Ray inref * float32 -> bool
     abstract member Intersect: Ray inref * Interaction outref * float32 byref -> bool
 
+[<Sealed>]
 type ListAggregate(instances: PrimitiveInstance array) =
     inherit PrimitiveAggregate()
 

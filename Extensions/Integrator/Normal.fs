@@ -3,6 +3,7 @@
 open Barnacle.Base
 open System.Numerics
 
+[<Sealed>]
 type NormalIntegrator(spp: int) =
     inherit ProgressiveIntegrator(spp)
     override this.Li(ray: Ray inref, aggregate: PrimitiveAggregate, _, sampler: Sampler byref) =

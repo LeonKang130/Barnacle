@@ -211,19 +211,19 @@ module BVHBuildUtil =
 
                     Interior(subtreeBounds, splitAxis, leftSubtree, rightSubtree)
 
-        member this.Build(items: Span<'T>, getBounds: 'T -> AABB) : BVHNode array =
-            let temp = items.ToArray()
-            let instances = Array.zeroCreate<BVHBuildInstance> items.Length
+        member this.Build(xs: Span<'T>, f: 'T -> AABB) : BVHNode array =
+            let temp = xs.ToArray()
+            let instances = Array.zeroCreate<BVHBuildInstance> xs.Length
 
-            for i = 0 to items.Length - 1 do
-                instances[i] <- { bounds = getBounds temp[i]; id = i }
+            for i = 0 to xs.Length - 1 do
+                instances[i] <- { bounds = f temp[i]; id = i }
 
             let nodes =
                 this.BuildSubtree(instances.AsSpan(), 0, instances.Length, 0)
                 |> BVHBuilder.Flatten
 
-            for i = 0 to items.Length - 1 do
-                items[i] <- temp[instances[i].id]
+            for i = 0 to xs.Length - 1 do
+                xs[i] <- temp[instances[i].id]
 
             nodes
 

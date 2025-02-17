@@ -1,6 +1,5 @@
 ﻿namespace Barnacle.Base
 
-open System
 open System.Numerics
 
 [<Struct>]
@@ -21,6 +20,7 @@ type LightBase(twoSided: bool) =
     member this.TwoSided = twoSided
     abstract member Eval: Vector3 * Vector2 -> Vector3
 
+[<Sealed>]
 type DiffuseLight(emission: Vector3, twoSided: bool) =
     inherit LightBase(twoSided)
     new(emission: Vector3) = DiffuseLight(emission, true)

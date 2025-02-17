@@ -10,9 +10,9 @@ type PinholeCamera(fovY: float32, aspectRatio: float32, pushForward: float32) =
     member this.AspectRatio = aspectRatio
     new(fovY: float32, aspectRatio: float32) = PinholeCamera(fovY, aspectRatio, 0f)
 
-    override this.GenerateRay(resolution: int * int, pixelId: int * int, uPixel: Vector2, _) =
-        let imageWidth, imageHeight = resolution
-        let imageX, imageY = pixelId
+    override this.GenerateRay(resolution: struct (int * int), pixelId: struct (int * int), uPixel: Vector2, _) =
+        let struct (imageWidth, imageHeight) = resolution
+        let struct (imageX, imageY) = pixelId
         let viewportHeight = 2f * MathF.Tan(fovY * MathF.PI / 360f)
         let viewportWidth = viewportHeight * aspectRatio
         let viewportU = viewportWidth * Vector3.UnitX
