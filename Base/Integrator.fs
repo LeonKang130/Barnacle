@@ -12,7 +12,7 @@ type IntegratorBase() =
 [<AbstractClass>]
 type ProgressiveIntegrator(spp: int, tileSize: int) =
     inherit IntegratorBase()
-    new(spp: int) = ProgressiveIntegrator(spp, 32)
+    new(spp: int) = ProgressiveIntegrator(spp, 8)
     member val FrameId = 0 with get, set
     member val SamplePerPixel = spp with get
     member val TileSize = tileSize with get
@@ -25,21 +25,21 @@ type ProgressiveIntegrator(spp: int, tileSize: int) =
         let tileXLast = min ((tx + 1) * this.TileSize) film.ImageWidth
         let tileYLast = min ((ty + 1) * this.TileSize) film.ImageHeight
 
-        for x = tileXFirst to tileXLast - 1 do
-            for y = tileYFirst to tileYLast - 1 do
+        for imageY = tileYFirst to tileYLast - 1 do
+            for imageX = tileXFirst to tileXLast - 1 do
                 let mutable accum = Vector3.Zero
 
                 for sampleId = 0 to this.SamplePerPixel - 1 do
                     let mutable sampler =
-                        Sampler(uint x, uint y, uint (this.FrameId * this.SamplePerPixel + sampleId))
+                        Sampler(uint imageX, uint imageY, uint (this.FrameId * this.SamplePerPixel + sampleId))
 
                     let struct (ray, pdf) =
-                        camera.GeneratePrimaryRay(film.Resolution, (x, y), sampler.Next2D(), sampler.Next2D())
+                        camera.GeneratePrimaryRay(film.Resolution, struct (imageX, imageY), sampler.Next2D(), sampler.Next2D())
 
                     let radiance = this.Li(&ray, aggregate, lightSampler, &sampler) / pdf
                     accum <- accum + (1f / float32 this.SamplePerPixel) * radiance
 
-                film.SetPixel((x, y), accum)
+                film.SetPixel(struct (imageX, imageY), accum)
 
     override this.Render(camera: CameraBase, film: Film, aggregate: PrimitiveAggregate, lightSampler: LightSamplerBase) =
         let tileXCount = (film.ImageWidth + this.TileSize - 1) / this.TileSize

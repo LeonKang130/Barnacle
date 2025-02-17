@@ -36,15 +36,15 @@ type Film(resolution: int * int, toneMapping: ToneMapping) =
     member inline this.Clear() =
         Parallel.For(0, this.Pixels.Length - 1, fun i -> this.Pixels[i] <- Vector3.Zero) |> ignore
 
-    member inline this.SetPixel(pixelId: int * int, color: Vector3) =
-        let imageX, imageY = pixelId
+    member inline this.SetPixel(pixelId: struct (int * int), color: Vector3) =
+        let struct (imageX, imageY) = pixelId
         let index = (this.ImageHeight - imageY - 1) * this.ImageWidth + imageX
         let pixels = &MemoryMarshal.GetArrayDataReference this.Pixels
         let pixel = &Unsafe.Add(&pixels, index)
         pixel <- color
 
-    member inline this.Accumulate(pixelId: int * int, color: Vector3) =
-        let imageX, imageY = pixelId
+    member inline this.Accumulate(pixelId: struct (int * int), color: Vector3) =
+        let struct (imageX, imageY) = pixelId
         let index = (this.ImageHeight - imageY - 1) * this.ImageWidth + imageX
         let pixels = &MemoryMarshal.GetArrayDataReference this.Pixels
         let pixel = &Unsafe.Add(&pixels, index)
