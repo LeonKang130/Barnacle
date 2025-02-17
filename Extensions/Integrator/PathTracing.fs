@@ -2,6 +2,7 @@
 namespace Barnacle.Extensions.Integrator
 
 open Barnacle.Base
+open System
 open System.Numerics
 
 [<Sealed>]
@@ -32,7 +33,7 @@ type PathTracingIntegrator(spp: int, maxDepth: int, rrDepth: int, rrThreshold: f
             else
                 if interaction.HasLight then
                     lightSample.eval <- lightSampler.Eval(ray.Origin, &interaction)
-                    let misWeight = bsdfSample.eval.pdf / (lightSample.eval.pdf + bsdfSample.eval.pdf)
+                    let misWeight = bsdfSample.eval.pdf * MathF.ReciprocalEstimate(lightSample.eval.pdf + bsdfSample.eval.pdf)
                     L <- Vector3.FusedMultiplyAdd(beta, lightSample.eval.L * misWeight, L)
                 if interaction.HasMaterial then
                     lightSample <- lightSampler.Sample(interaction.Position, sampler.Next1D(), sampler.Next2D())
@@ -41,16 +42,16 @@ type PathTracingIntegrator(spp: int, maxDepth: int, rrDepth: int, rrThreshold: f
                     if lightSample.eval.pdf <> 0f && not (aggregate.Intersect(&shadowRay, lightDistance - 1e-3f)) then
                         bsdfSample.eval <- interaction.EvalBSDF(-ray.Direction, lightSample.wi)
                         L <- Vector3.FusedMultiplyAdd(beta * bsdfSample.eval.bsdf,
-                            lightSample.eval.L * (1f / (bsdfSample.eval.pdf + lightSample.eval.pdf)), L)
+                            lightSample.eval.L *  MathF.ReciprocalEstimate(bsdfSample.eval.pdf + lightSample.eval.pdf), L)
                     bsdfSample <- interaction.SampleBSDF(-ray.Direction, sampler.Next2D())
                     if bsdfSample.eval.pdf = 0f then
                         depth <- this.MaxDepth
                     else
                         ray <- interaction.SpawnRay(bsdfSample.wi)
-                        beta <- beta * bsdfSample.eval.bsdf / bsdfSample.eval.pdf
+                        beta <- beta * bsdfSample.eval.bsdf * MathF.ReciprocalEstimate(bsdfSample.eval.pdf)
                         if depth >= this.RRDepth then
                             if sampler.Next1D() < this.RRThreshold then
-                                beta <- beta / this.RRThreshold
+                                beta <- beta * MathF.ReciprocalEstimate(this.RRThreshold)
                             else
                                 depth <- this.MaxDepth
                         depth <- depth + 1
