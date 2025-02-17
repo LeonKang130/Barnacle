@@ -3,6 +3,7 @@
 open System
 open System.Numerics
 open System.Runtime.CompilerServices
+open System.Runtime.Intrinsics
 
 [<IsReadOnly; Struct>]
 type AxisAlignedBoundingBox =
@@ -28,13 +29,12 @@ type AxisAlignedBoundingBox =
         let invDir = Vector3.One / ray.Direction
         let mutable tMin = 1e-3f
         let mutable tMax = t
-
-        for i = 0 to 2 do
-            let t0 = (this.pMin[i] - ray.Origin[i]) * invDir[i]
-            let t1 = (this.pMax[i] - ray.Origin[i]) * invDir[i]
-            tMin <- MathF.Max(tMin, MathF.Min(t0, t1))
-            tMax <- MathF.Min(tMax, MathF.Max(t0, t1))
-
+        let t0 = (this.pMin - ray.Origin) * invDir
+        let t1 = (this.pMax - ray.Origin) * invDir
+        let t0' = Vector3.Min(t0, t1)
+        let t1' = Vector3.Max(t0, t1)
+        tMin <- MathF.Max(tMin, MathF.Max(t0'.X, MathF.Max(t0'.Y, t0'.Z)))
+        tMax <- MathF.Min(tMax, MathF.Min(t1'.X, MathF.Min(t1'.Y, t1'.Z)))
         tMin <= tMax
 
     static member inline Transform(aabb: AxisAlignedBoundingBox inref, m: Matrix4x4) =
@@ -73,13 +73,10 @@ type OrthonormalBasis =
                 Vector3.UnitX
             |> fun x -> Vector3.Cross(n, x)
             |> Vector3.Normalize
-
-        let b = Vector3.Cross(n, t)
-        { n = n; t = t; b = b }
+        { n = n; t = t; b = Vector3.Cross(n, t) }
 
     new(n: Vector3, t: Vector3) =
-        let b = Vector3.Cross(n, t)
-        { n = n; t = t; b = b }
+        { n = n; t = t; b = Vector3.Cross(n, t) }
 
     member inline this.LocalToWorld(v: Vector3) =
         v.X * this.t + v.Y * this.b + v.Z * this.n
@@ -191,7 +188,7 @@ and [<AbstractClass>] PrimitiveInstance
         this.Bounds <-
             AxisAlignedBoundingBox.Transform(this.Primitive.Bounds, objectToWorld)
     
-    abstract member Sample: float32 * Vector2 -> Interaction * float32
+    abstract member Sample: float32 * Vector2 -> struct (Interaction * float32)
     abstract member EvalPDF: Interaction inref -> float32
 
 [<AbstractClass>]

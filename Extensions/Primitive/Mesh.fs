@@ -15,8 +15,13 @@ type internal Triangle(p0: Vector3, p1: Vector3, p2: Vector3) =
     member this.P0 = p0
     member this.P1 = p1
     member this.P2 = p2
+    
+    member inline this.Bounds =
+        let pMin = Vector3.Min(Vector3.Min(p0, p1), p2)
+        let pMax = Vector3.Max(Vector3.Max(p0, p1), p2)
+        AxisAlignedBoundingBox(pMin, pMax)
 
-    member this.Intersect(ray: Ray inref, t: float32) =
+    member inline this.Intersect(ray: Ray inref, t: float32) =
         let eps = Single.Epsilon
         let e0 = this.P1 - this.P0
         let e1 = this.P2 - this.P0
@@ -42,7 +47,7 @@ type internal Triangle(p0: Vector3, p1: Vector3, p2: Vector3) =
                     let t' = invDet * Vector3.Dot(e1, sCrossE0)
                     t' > eps && t' < t
 
-    member this.Intersect(ray: Ray inref, geom: LocalGeometry outref, t: float32 byref) =
+    member inline this.Intersect(ray: Ray inref, geom: LocalGeometry outref, t: float32 byref) =
         let eps = Single.Epsilon
         let e0 = this.P1 - this.P0
         let e1 = this.P2 - this.P0
@@ -80,12 +85,12 @@ type internal Triangle(p0: Vector3, p1: Vector3, p2: Vector3) =
                     else
                         false
 
-    member this.SurfaceArea =
+    member inline this.SurfaceArea =
         let e0 = this.P1 - this.P0
         let e1 = this.P2 - this.P0
         0.5f * Vector3.Cross(e0, e1).Length()
 
-    member this.Sample(uSurface: Vector2) =
+    member inline this.Sample(uSurface: Vector2) =
         let uv =
             if uSurface.X < uSurface.Y then
                 Vector2(0.5f * uSurface.X, uSurface.Y - 0.5f * uSurface.X)
@@ -97,13 +102,13 @@ type internal Triangle(p0: Vector3, p1: Vector3, p2: Vector3) =
         let pdf = 2f / n.Length()
         LocalGeometry(p, Vector3.Normalize(n), uv), pdf
 
-    static member Transform(triangle: Triangle inref, m: Matrix4x4) =
+    static member inline Transform(triangle: Triangle inref, m: Matrix4x4) =
         let p0 = Vector3.Transform(triangle.P0, m)
         let p1 = Vector3.Transform(triangle.P1, m)
         let p2 = Vector3.Transform(triangle.P2, m)
         Triangle(p0, p1, p2)
 
-    static member Transform(triangle: Triangle, m: Matrix4x4) =
+    static member inline Transform(triangle: Triangle, m: Matrix4x4) =
         let p0 = Vector3.Transform(triangle.P0, m)
         let p1 = Vector3.Transform(triangle.P1, m)
         let p2 = Vector3.Transform(triangle.P2, m)
@@ -178,11 +183,12 @@ type MeshPrimitive(vertices: Vector3 array, indices: int array) =
         let traversalStack = &BLASTraversal.stackalloc<int> 128
         let mutable stackTop = 1
         BLASTraversal.stackPush(&traversalStack, &stackTop, 0)
+        let nodes = &MemoryMarshal.GetArrayDataReference this.BVHNodes
         let mutable hit = false
 
         while not hit && stackTop <> 0 do
             let i = BLASTraversal.stackPop(&traversalStack, &stackTop)
-            let node = this.BVHNodes[i]
+            let node = Unsafe.Add(&nodes, i)
 
             if node.Bounds.Intersect(&ray, t) then
                 if node.IsLeaf then
@@ -190,7 +196,8 @@ type MeshPrimitive(vertices: Vector3 array, indices: int array) =
 
                     while not hit && instanceId < node.InstanceOffset + node.InstanceCount do
                         let triangle = this.FetchTriangle(instanceId)
-                        hit <- triangle.Intersect(&ray, t)
+                        if triangle.Bounds.Intersect(&ray, t) then
+                            hit <- triangle.Intersect(&ray, t)
                         instanceId <- instanceId + 1
                 else
                     if ray.Direction[node.SplitAxis] > 0f then
@@ -206,17 +213,19 @@ type MeshPrimitive(vertices: Vector3 array, indices: int array) =
         let traversalStack = &BLASTraversal.stackalloc<int> 128
         let mutable stackTop = 0
         BLASTraversal.stackPush(&traversalStack, &stackTop, 0)
+        let nodes = &MemoryMarshal.GetArrayDataReference this.BVHNodes
         let mutable hit = false
 
         while stackTop <> 0 do
             let i = BLASTraversal.stackPop(&traversalStack, &stackTop)
-            let node = this.BVHNodes[i]
+            let node = Unsafe.Add(&nodes, i)
 
             if node.Bounds.Intersect(&ray, t) then
                 if node.IsLeaf then
                     for instanceId = node.InstanceOffset to node.InstanceOffset + node.InstanceCount - 1 do
                         let triangle = this.FetchTriangle(instanceId)
-                        hit <- triangle.Intersect(&ray, &geom, &t) || hit
+                        if triangle.Bounds.Intersect(&ray, t) then
+                            hit <- triangle.Intersect(&ray, &geom, &t) || hit
                 else
                     if ray.Direction[node.SplitAxis] > 0f then
                         BLASTraversal.stackPush(&traversalStack, &stackTop, node.RightChild)
@@ -229,7 +238,7 @@ type MeshPrimitive(vertices: Vector3 array, indices: int array) =
 
     override this.Bounds = this.BVHNodes[0].Bounds
 
-    static member Load(path: string) =
+    static member inline Load(path: string) =
         let vertices = ResizeArray<Vector3>()
         let indices = ResizeArray<int>()
         use reader = new StreamReader(path)
@@ -281,7 +290,7 @@ type MeshInstance(mesh: MeshPrimitive, material: MaterialBase option, light: Lig
         geom.tag <- i
         interaction.geom <- geom
         interaction.inst <- this
-        interaction, pdfTriangle * pdfArea
+        struct (interaction, pdfTriangle * pdfArea)
 
     override this.EvalPDF(interaction: Interaction inref) =
         let i = interaction.geom.tag

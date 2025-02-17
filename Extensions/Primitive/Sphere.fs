@@ -120,7 +120,7 @@ type SphereInstance(sphere: SpherePrimitive, material: MaterialBase option, ligh
         let n' = Vector3.Cross(t', b')
         let invJacobian = 1f / n'.Length()
         interaction.geom <- LocalGeometry(p', invJacobian * n', uSurface)
-        interaction, invJacobian / (4f * MathF.PI * this.Sphere.Radius * this.Sphere.Radius)
+        struct (interaction, invJacobian / (4f * MathF.PI * this.Sphere.Radius * this.Sphere.Radius))
 
     override this.EvalPDF(interaction: Interaction inref) =
         let t' =

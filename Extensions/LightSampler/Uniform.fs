@@ -14,7 +14,7 @@ type UniformLightSampler(primitiveInstances: PrimitiveInstance array) =
         let mutable uSelect = uSelect * float32 this.Instances.Length
         let primitiveId = min (int uSelect) (this.Instances.Length - 1)
         uSelect <- uSelect - float32 primitiveId
-        let interaction, pdfSurface =
+        let struct (interaction, pdfSurface) =
             Unsafe.Add(&MemoryMarshal.GetArrayDataReference this.Instances, primitiveId).Sample(uSelect, uLight)
         let wo = Vector3.Normalize(p - interaction.Position)
         let cosWo = Vector3.Dot(interaction.Normal, wo)
