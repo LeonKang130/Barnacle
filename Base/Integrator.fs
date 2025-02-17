@@ -12,7 +12,7 @@ type IntegratorBase() =
 [<AbstractClass>]
 type ProgressiveIntegrator(spp: int, tileSize: int) =
     inherit IntegratorBase()
-    new(spp: int) = ProgressiveIntegrator(spp, 8)
+    new(spp: int) = ProgressiveIntegrator(spp, 16)
     member val FrameId = 0 with get, set
     member val SamplePerPixel = spp with get
     member val TileSize = tileSize with get
