@@ -125,17 +125,17 @@ type MLTSampler =
                     let effectiveSigma =
                         sigma * MathF.Sqrt(float32 (this.CurrentIteration - x.LastModification))
 
-                    let value = MathF.FusedMultiplyAdd(normalSample, effectiveSigma, x.Value)
-                    value - MathF.Floor(value)
+                    MathF.FusedMultiplyAdd(normalSample, effectiveSigma, x.Value)
                 | Kelemen(epsMin, epsMax) ->
                     let mutable value = x.Value
                     let a = MathF.Log(epsMax / epsMin)
-                    while x.LastModification < this.CurrentIteration do
+                    for _ = x.LastModification to this.CurrentIteration - 1 do
                         let u1 = this.InnerSampler.Next1D() - 0.5f
-                        let u2 = if u1 < 0f then 1f - 2f * u1 else 2f * u1
+                        let u2 = if u1 < 0f then 1f + 2f * u1 else 2f * u1
+                        
                         value <- value + MathF.CopySign(epsMax * MathF.Exp(-a * u2), u1)
-                        x.LastModification <- x.LastModification + 1
-                    value - MathF.Floor(value)
+                    value
+                |> fun x -> x - MathF.Floor(x)
 
         x.LastModification <- this.CurrentIteration
         x.Value
@@ -237,7 +237,7 @@ type PSSMLTIntegrator
         let imageY = min (imageHeight - 1) (int uPixel.Y)
         let pixelId = struct (imageX, imageY)
         let struct (ray, pdf) = camera.GeneratePrimaryRay(film.Resolution, pixelId, uPixel - Vector2(float32 imageX, float32 imageY), mltSampler.Next2D())
-        let L = this.Li(&ray, aggregate, lightSampler, &mltSampler) * (1f / pdf)
+        let L = this.Li(&ray, aggregate, lightSampler, &mltSampler) * MathF.ReciprocalEstimate(pdf)
         let y = Vector3.Dot(L, Vector3(0.2126f, 0.7152f, 0.0722f))
         this.BootstrapWeights[bootstrapId] <- y
     
@@ -253,29 +253,29 @@ type PSSMLTIntegrator
         let imageY = min (imageHeight - 1) (int uPixel.Y)
         let mutable pixelId = struct (imageX, imageY)
         let struct (ray, pdf) = camera.GeneratePrimaryRay(film.Resolution, pixelId, uPixel - Vector2(float32 imageX, float32 imageY), mltSampler.Next2D())
-        let mutable L = this.Li(&ray, aggregate, lightSampler, &mltSampler) * (1f / pdf)
+        let mutable L = this.Li(&ray, aggregate, lightSampler, &mltSampler) * MathF.ReciprocalEstimate(pdf)
         let mutable y = Vector3.Dot(L, Vector3(0.2126f, 0.7152f, 0.0722f))
         mltSampler.Accept()
         mltSampler.InnerSampler <- Sampler(uint chainId, uint bootstrapId, uint this.FrameId)
         let mutationPerChain = int ((uint64 this.SamplePerPixel * uint64 imageWidth * uint64 imageHeight + uint64 this.NChains - 1uL) / uint64 this.NChains)
-        let effectiveSamplePerPixel = float32 mutationPerChain * float32 this.NChains / float32 (imageWidth * imageHeight)
-        let invEffectiveSamplePerPixel = 1f / effectiveSamplePerPixel
+        let invEffectiveSamplePerPixel = MathF.ReciprocalEstimate(float32 mutationPerChain * float32 this.NChains / float32 (imageWidth * imageHeight))
         let mutable radiance = Vector3.Zero
         let mutable acceptedMutationCount = 0
-        for j = 0 to mutationPerChain - 1 do
+        let invB = MathF.ReciprocalEstimate(this.B)
+        for _ = 0 to mutationPerChain - 1 do
             mltSampler.StartIteration()
             let uPixel = mltSampler.Next2D() * Vector2(float32 imageWidth, float32 imageHeight)
             let imageX = min (imageWidth - 1) (int uPixel.X)
             let imageY = min (imageHeight - 1) (int uPixel.Y)
             let mutable pixelIdNew = struct (imageX, imageY)
             let struct (ray, pdf) = camera.GeneratePrimaryRay(film.Resolution, pixelIdNew, uPixel - Vector2(float32 imageX, float32 imageY), mltSampler.Next2D())
-            let LNew = this.Li(&ray, aggregate, lightSampler, &mltSampler) * (1f / pdf)
+            let LNew = this.Li(&ray, aggregate, lightSampler, &mltSampler) * MathF.ReciprocalEstimate(pdf)
             let yNew = Vector3.Dot(LNew, Vector3(0.2126f, 0.7152f, 0.0722f))
             let accept = MathF.Min(1f, yNew / y)
-            let wOld = (1f - accept) / (y / this.B + this.LargeStepProb)
+            let wOld = (1f - accept) / MathF.FusedMultiplyAdd(y, invB, this.LargeStepProb)
             // let wOld = (1f - accept) / (y * invB)
             radiance <- radiance + wOld * L
-            let wNew = (accept + if mltSampler.LargeStep then 1f else 0f) / (yNew / this.B + this.LargeStepProb)
+            let wNew = (accept + if mltSampler.LargeStep then 1f else 0f) / MathF.FusedMultiplyAdd(yNew, invB, this.LargeStepProb)
             // let wNew = if yNew > 0f then accept / (yNew * invB) else 0f
             if sampler.Next1D() < accept then
                 acceptedMutationCount <- acceptedMutationCount + 1
@@ -304,7 +304,7 @@ type PSSMLTIntegrator
         Parallel.For(0, bootstrapDispatchCount, bootstrap) |> ignore
         this.B <- Array.average this.BootstrapWeights
         if this.B = 0f then
-            printfn "Warning: all bootstrap samples are zero, exiting."
+            printfn "Warning: all bootstrap samples are zero, exiting..."
         else
             let bootstrapSamplingTable = AliasTable(this.BootstrapWeights)
             let chainDispatchCount = (this.NChains + dispatchSize - 1) / dispatchSize

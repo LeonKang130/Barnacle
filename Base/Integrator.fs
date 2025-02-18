@@ -24,6 +24,7 @@ type ProgressiveIntegrator(spp: int, tileSize: int) =
         let tileYFirst = ty * this.TileSize
         let tileXLast = min ((tx + 1) * this.TileSize) film.ImageWidth
         let tileYLast = min ((ty + 1) * this.TileSize) film.ImageHeight
+        let invSamplePerPixel = MathF.ReciprocalEstimate(float32 this.SamplePerPixel)
 
         for imageY = tileYFirst to tileYLast - 1 do
             for imageX = tileXFirst to tileXLast - 1 do
@@ -36,8 +37,8 @@ type ProgressiveIntegrator(spp: int, tileSize: int) =
                     let struct (ray, pdf) =
                         camera.GeneratePrimaryRay(film.Resolution, struct (imageX, imageY), sampler.Next2D(), sampler.Next2D())
 
-                    let radiance = this.Li(&ray, aggregate, lightSampler, &sampler) / pdf
-                    accum <- accum + (1f / float32 this.SamplePerPixel) * radiance
+                    let radiance = this.Li(&ray, aggregate, lightSampler, &sampler) * MathF.ReciprocalEstimate(pdf)
+                    accum <- Vector3.FusedMultiplyAdd(Vector3(invSamplePerPixel), radiance, accum)
 
                 film.SetPixel(struct (imageX, imageY), accum)
 
