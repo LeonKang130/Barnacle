@@ -1,11 +1,13 @@
 ﻿#nowarn "9"
 namespace Barnacle.Extensions.Integrator
 
+open System.Threading
 open Barnacle.Base
 open System
 open System.Numerics
 open System.Runtime.CompilerServices
 open Microsoft.FSharp.NativeInterop
+open System.Threading.Tasks
 
 [<IsReadOnly; Struct>]
 type MutationStrategy =
@@ -158,16 +160,19 @@ type PSSMLTIntegrator
     (nBootstrap: int, nChains: int, mutationPerPixel: int, strategy: MutationStrategy, largeStepProb: float32) =
     inherit ProgressiveIntegrator(mutationPerPixel)
     new(mutationPerPixel: int) =
-        let defaultStrategy = MutationStrategy.Gaussian(0.1f)
+        let defaultStrategy = MutationStrategy.Gaussian(1e-4f)
         // let defaultStrategy = MutationStrategy.Kelemen(1f / 1024f, 1f / 16f)
         PSSMLTIntegrator(1024 * 1024, 256 * 1024, mutationPerPixel, defaultStrategy, 0.5f)
     member this.MaxDepth = 8
     member this.RRDepth = 5
-    member this.RRThreshold = 0.95f
     member this.NBootstrap = nBootstrap
     member this.NChains = nChains
     member this.Strategy = strategy
     member this.LargeStepProb = largeStepProb
+    
+    [<DefaultValue>] val mutable AcceptedMutationCount: int
+
+    [<DefaultValue>] val mutable ProposedMutationCount: int
 
     member inline this.Li
         (ray: Ray inref, aggregate: PrimitiveAggregate, lightSampler: LightSamplerBase, sampler: MLTSampler byref) =
@@ -191,7 +196,6 @@ type PSSMLTIntegrator
                     lightSample.eval <- lightSampler.Eval(ray.Origin, &interaction)
                     let misWeight = bsdfSample.eval.pdf * MathF.ReciprocalEstimate(lightSample.eval.pdf + bsdfSample.eval.pdf)
                     L <- Vector3.FusedMultiplyAdd(beta, lightSample.eval.L * misWeight, L)
-
                 if interaction.HasMaterial then
                     lightSample <- lightSampler.Sample(interaction.Position, sampler.Next1D(), sampler.Next2D())
                     let shadowRay = interaction.SpawnRay(lightSample.wi)
@@ -202,7 +206,6 @@ type PSSMLTIntegrator
 
                         L <- Vector3.FusedMultiplyAdd(beta * bsdfSample.eval.bsdf,
                             lightSample.eval.L *  MathF.ReciprocalEstimate(bsdfSample.eval.pdf + lightSample.eval.pdf), L)
-
                     bsdfSample <- interaction.SampleBSDF(-ray.Direction, sampler.Next2D())
                     if bsdfSample.eval.pdf = 0f then
                         depth <- this.MaxDepth
@@ -210,8 +213,9 @@ type PSSMLTIntegrator
                         ray <- interaction.SpawnRay(bsdfSample.wi)
                         beta <- beta * bsdfSample.eval.bsdf * MathF.ReciprocalEstimate(bsdfSample.eval.pdf)
                         if depth >= this.RRDepth then
-                            if sampler.Next1D() < this.RRThreshold then
-                                beta <- beta * MathF.ReciprocalEstimate(this.RRThreshold)
+                            let rrThreshold = MathF.Min(1f, MathF.Max(beta.X, MathF.Max(beta.Y, beta.Z)))
+                            if sampler.Next1D() < rrThreshold then
+                                beta <- beta * MathF.ReciprocalEstimate(rrThreshold)
                             else
                                 depth <- this.MaxDepth
 
@@ -245,17 +249,18 @@ type PSSMLTIntegrator
             let pixelId = struct (tileXFirst + tileX, tileYFirst + tileY)
             let struct (ray, pdf) = camera.GeneratePrimaryRay(film.Resolution, pixelId, uPixel - Vector2(float32 tileX, float32 tileY), mltSampler.Next2D())
             let L = this.Li(&ray, aggregate, lightSampler, &mltSampler) * (1f / pdf)
-            bootstrapWeights[bootstrapId] <- Single.Clamp(L.X, 0f, 1f) + Single.Clamp(L.Y, 0f, 1f) + Single.Clamp(L.Z, 0f, 1f)
+            bootstrapWeights[bootstrapId] <- Vector3.Dot(L, Vector3(0.2126f, 0.7152f, 0.0722f))
         let b = Array.average bootstrapWeights
         if b = 0f then printfn "Warning: all bootstrap weights are zero"
         let invB = 1f / b
         let bootstrapSamplingTable = AliasTable(bootstrapWeights)
         let nChainsPerTile = int ((uint64 this.NChains * tileSize + imageSize - 1uL) / imageSize)
-        let mutationsPerChain = int ((uint64 this.SamplePerPixel * tileSize + uint64 nChainsPerTile - 1UL) / uint64 nChainsPerTile)
-        let effectiveSamplePerPixel = float32 (mutationsPerChain * nChainsPerTile) / float32 (tileWidth * tileHeight)
+        let mutationPerChain = int ((uint64 this.SamplePerPixel * tileSize + uint64 nChainsPerTile - 1UL) / uint64 nChainsPerTile)
+        let effectiveSamplePerPixel = float32 (mutationPerChain * nChainsPerTile) / float32 (tileWidth * tileHeight)
         let invEffectiveSamplePerPixel = 1f / effectiveSamplePerPixel
+        let mutable acceptedMutationCount = 0
+        let mutable sampler = Sampler(uint this.FrameId, uint tx, uint ty)
         for chainId = 0 to nChainsPerTile - 1 do
-            let mutable sampler = Sampler(uint (chainId + nChainsPerTile * this.FrameId), uint tx, uint ty)
             let bootstrapId, _ = bootstrapSamplingTable.Sample(sampler.Next1D())
             mltSampler.Reset()
             mltSampler.InnerSampler <- Sampler(uint (bootstrapId + nBootstrapPerTile * this.FrameId), uint tx, uint ty)
@@ -265,10 +270,10 @@ type PSSMLTIntegrator
             let mutable pixelId = struct (tileXFirst + tileX, tileYFirst + tileY)
             let struct (ray, pdf) = camera.GeneratePrimaryRay(film.Resolution, pixelId, uPixel - Vector2(float32 tileX, float32 tileY), mltSampler.Next2D())
             let mutable L = this.Li(&ray, aggregate, lightSampler, &mltSampler) * (1f / pdf)
-            let mutable y = Single.Clamp(L.X, 0f, 1f) + Single.Clamp(L.Y, 0f, 1f) + Single.Clamp(L.Z, 0f, 1f)
+            let mutable y = Vector3.Dot(L, Vector3(0.2126f, 0.7152f, 0.0722f))
             let mutable radiance = Vector3.Zero
             mltSampler.InnerSampler <- Sampler(uint chainId, uint bootstrapId, uint (ty * tileXCount + tx))
-            for j = 0 to mutationsPerChain - 1 do
+            for j = 0 to mutationPerChain - 1 do
                 mltSampler.StartIteration()
                 let uPixel = mltSampler.Next2D() * Vector2(float32 tileWidth, float32 tileHeight)
                 let tileX = min (tileWidth - 1) (int uPixel.X)
@@ -276,7 +281,7 @@ type PSSMLTIntegrator
                 let mutable pixelIdNew = struct (tileXFirst + tileX, tileYFirst + tileY)
                 let struct (ray, pdf) = camera.GeneratePrimaryRay(film.Resolution, pixelIdNew, uPixel - Vector2(float32 tileX, float32 tileY), mltSampler.Next2D())
                 let LNew = this.Li(&ray, aggregate, lightSampler, &mltSampler) * (1f / pdf)
-                let yNew = Single.Clamp(LNew.X, 0f, 1f) + Single.Clamp(LNew.Y, 0f, 1f) + Single.Clamp(LNew.Z, 0f, 1f)
+                let yNew = Vector3.Dot(LNew, Vector3(0.2126f, 0.7152f, 0.0722f))
                 let accept = MathF.Min(1f, yNew / y)
                 let wOld = (1f - accept) / Single.FusedMultiplyAdd(y, invB, this.LargeStepProb)
                 // let wOld = (1f - accept) / (y * invB)
@@ -284,6 +289,7 @@ type PSSMLTIntegrator
                 let wNew = (accept + if mltSampler.LargeStep then 1f else 0f) / Single.FusedMultiplyAdd(yNew, invB, this.LargeStepProb)
                 // let wNew = if yNew > 0f then accept / (yNew * invB) else 0f
                 if sampler.Next1D() < accept then
+                    acceptedMutationCount <- acceptedMutationCount + 1
                     film.Accumulate(pixelId, radiance * invEffectiveSamplePerPixel)
                     radiance <- wNew * LNew
                     pixelId <- pixelIdNew
@@ -295,3 +301,17 @@ type PSSMLTIntegrator
                         film.Accumulate(pixelIdNew, (wNew * invEffectiveSamplePerPixel) * LNew)
                     mltSampler.Reject()
             film.Accumulate(pixelId, radiance * invEffectiveSamplePerPixel)
+        Interlocked.Add(&this.AcceptedMutationCount, acceptedMutationCount) |> ignore
+        Interlocked.Add(&this.ProposedMutationCount, nChainsPerTile * mutationPerChain) |> ignore
+    
+    override this.Render(camera: CameraBase, film: Film, aggregate: PrimitiveAggregate, lightSampler: LightSamplerBase) =
+        let tileXCount = (film.ImageWidth + this.TileSize - 1) / this.TileSize
+        let tileYCount = (film.ImageHeight + this.TileSize - 1) / this.TileSize
+        this.AcceptedMutationCount <- 0
+        this.ProposedMutationCount <- 0
+        Parallel.For(0, tileXCount * tileYCount, fun tileIdx ->
+            this.RenderTile(tileIdx % tileXCount, tileIdx / tileXCount, camera, film, aggregate, lightSampler)) |> ignore
+        this.FrameId <- this.FrameId + 1
+        printfn $"Proposed mutation count: {this.ProposedMutationCount}"
+        printfn $"Accepted mutation count: {this.AcceptedMutationCount}"
+        printfn $"Acceptance rate: {float32 this.AcceptedMutationCount / float32 this.ProposedMutationCount}"

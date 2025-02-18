@@ -6,13 +6,12 @@ open System
 open System.Numerics
 
 [<Sealed>]
-type PathTracingIntegrator(spp: int, maxDepth: int, rrDepth: int, rrThreshold: float32) =
+type PathTracingIntegrator(spp: int, maxDepth: int, rrDepth: int) =
     inherit ProgressiveIntegrator(spp)
-    new(spp) = PathTracingIntegrator(spp, 8, 5, 0.95f)
-    new(spp, maxDepth) = PathTracingIntegrator(spp, maxDepth, 5, 0.95f)
+    new(spp) = PathTracingIntegrator(spp, 8, 5)
+    new(spp, maxDepth) = PathTracingIntegrator(spp, maxDepth, 5)
     member this.MaxDepth = maxDepth
     member this.RRDepth = rrDepth
-    member this.RRThreshold = rrThreshold
 
     override this.Li
         (ray: Ray inref, aggregate: PrimitiveAggregate, lightSampler: LightSamplerBase, sampler: Sampler byref)
@@ -50,8 +49,9 @@ type PathTracingIntegrator(spp: int, maxDepth: int, rrDepth: int, rrThreshold: f
                         ray <- interaction.SpawnRay(bsdfSample.wi)
                         beta <- beta * bsdfSample.eval.bsdf * MathF.ReciprocalEstimate(bsdfSample.eval.pdf)
                         if depth >= this.RRDepth then
-                            if sampler.Next1D() < this.RRThreshold then
-                                beta <- beta * MathF.ReciprocalEstimate(this.RRThreshold)
+                            let rrThreshold = MathF.Min(1f, MathF.Max(beta.X, MathF.Max(beta.Y, beta.Z)))
+                            if sampler.Next1D() < rrThreshold then
+                                beta <- beta * MathF.ReciprocalEstimate(rrThreshold)
                             else
                                 depth <- this.MaxDepth
                         depth <- depth + 1

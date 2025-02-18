@@ -12,7 +12,7 @@ open System.Diagnostics
 let main _ =
     let imageWidth, imageHeight = 1024, 768
     let film = Film((imageWidth, imageHeight), ToneMapping.Aces)
-    // let mutable camera = PinholeCamera(30f, float32 imageWidth / float32 imageHeight, 140f)
+    // let camera = PinholeCamera(30f, float32 imageWidth / float32 imageHeight, 140f)
     let camera = ThinLensCamera(10f, 270f, 25f, float32 imageWidth / float32 imageHeight, 140f)
     camera.UpdateTransform(Matrix4x4.CreateTranslation(50f, 40.8f, 295.6f))
     let whiteMaterial = Lambertian(Vector3(0.75f)) :> MaterialBase
