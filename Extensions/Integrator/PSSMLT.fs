@@ -242,7 +242,7 @@ type PSSMLTIntegrator
         let mutable mltSampler = MLTSampler(Sampler(), this.LargeStepProb, this.Strategy, xs)
         for bootstrapId = 0 to bootstrapWeights.Length - 1 do
             mltSampler.Reset()
-            mltSampler.InnerSampler <- Sampler(uint (bootstrapId + nBootstrapPerTile * this.FrameId), uint tx, uint ty)
+            mltSampler.InnerSampler <- Sampler(uint (bootstrapId + nBootstrapPerTile * this.FrameId))
             let uPixel = mltSampler.Next2D() * Vector2(float32 tileWidth, float32 tileHeight)
             let tileX = min (tileWidth - 1) (int uPixel.X)
             let tileY = min (tileHeight - 1) (int uPixel.Y)
@@ -263,7 +263,7 @@ type PSSMLTIntegrator
         for chainId = 0 to nChainsPerTile - 1 do
             let bootstrapId, _ = bootstrapSamplingTable.Sample(sampler.Next1D())
             mltSampler.Reset()
-            mltSampler.InnerSampler <- Sampler(uint (bootstrapId + nBootstrapPerTile * this.FrameId), uint tx, uint ty)
+            mltSampler.InnerSampler <- Sampler(uint (bootstrapId + nBootstrapPerTile * this.FrameId))
             let uPixel = mltSampler.Next2D() * Vector2(float32 tileWidth, float32 tileHeight)
             let tileX = min (tileWidth - 1) (int uPixel.X)
             let tileY = min (tileHeight - 1) (int uPixel.Y)
