@@ -7,6 +7,11 @@ open System.Numerics
 open System.Runtime.CompilerServices
 open Microsoft.FSharp.NativeInterop
 
+[<IsReadOnly; Struct>]
+type MutationStrategy =
+    | Kelemen of epsMin: float32 * epsMax: float32
+    | Gaussian of sigma: float32
+
 [<Struct>]
 type PrimarySample =
     val mutable Value: float32
@@ -26,7 +31,7 @@ type PrimarySample =
 type MLTSampler =
     val mutable InnerSampler: Sampler
     val LargeStepProb: float32
-    val Sigma: float32
+    val Strategy: MutationStrategy
     val Xs: nativeptr<PrimarySample>
     val mutable LargeStep: bool
     val mutable LastLargeStepIteration: int
@@ -34,11 +39,11 @@ type MLTSampler =
     val mutable SampleIndex: int
     val mutable InitializedSampleCount: int
 
-    new(innerSampler: Sampler, largeStepProb: float32, sigma: float32, xs: nativeptr<PrimarySample>) =
+    new(innerSampler: Sampler, largeStepProb: float32, strategy: MutationStrategy, xs: nativeptr<PrimarySample>) =
         {
             InnerSampler = innerSampler
             LargeStepProb = largeStepProb
-            Sigma = sigma
+            Strategy = strategy
             Xs = xs
             LargeStep = true
             LastLargeStepIteration = 0
@@ -111,13 +116,24 @@ type MLTSampler =
             if this.LargeStep then
                 this.InnerSampler.Next1D()
             else
-                let normalSample = MathF.Sqrt(2f) * ErfInv(MathF.FusedMultiplyAdd(2f, this.InnerSampler.Next1D(), -1f))
+                match this.Strategy with
+                | Gaussian sigma ->
+                    let normalSample = MathF.Sqrt(2f) * ErfInv(MathF.FusedMultiplyAdd(2f, this.InnerSampler.Next1D(), -1f))
 
-                let effectiveSigma =
-                    this.Sigma * MathF.Sqrt(float32 (this.CurrentIteration - x.LastModification))
+                    let effectiveSigma =
+                        sigma * MathF.Sqrt(float32 (this.CurrentIteration - x.LastModification))
 
-                let value = MathF.FusedMultiplyAdd(normalSample, effectiveSigma, x.Value)
-                value - MathF.Floor(value)
+                    let value = MathF.FusedMultiplyAdd(normalSample, effectiveSigma, x.Value)
+                    value - MathF.Floor(value)
+                | Kelemen(epsMin, epsMax) ->
+                    let mutable value = x.Value
+                    let a = MathF.Log(epsMax / epsMin)
+                    while x.LastModification < this.CurrentIteration do
+                        let u1 = this.InnerSampler.Next1D() - 0.5f
+                        let u2 = if u1 < 0f then 1f - 2f * u1 else 2f * u1
+                        value <- value + MathF.CopySign(epsMax * MathF.Exp(-a * u2), u1)
+                        x.LastModification <- x.LastModification + 1
+                    value - MathF.Floor(value)
 
         x.LastModification <- this.CurrentIteration
         x.Value
@@ -138,16 +154,19 @@ type MLTSampler =
             this.LastLargeStepIteration <- this.CurrentIteration
 
 [<Sealed>]
-type MetropolisIntegrator
-    (nBootstrap: int, nChains: int, mutationPerPixel: int, sigma: float32, largeStepProb: float32) =
+type PSSMLTIntegrator
+    (nBootstrap: int, nChains: int, mutationPerPixel: int, strategy: MutationStrategy, largeStepProb: float32) =
     inherit ProgressiveIntegrator(mutationPerPixel)
-    new(mutationPerPixel: int) = MetropolisIntegrator(1024 * 1024, 256 * 1024, mutationPerPixel, 1e-1f, 0.3f)
+    new(mutationPerPixel: int) =
+        let defaultStrategy = MutationStrategy.Gaussian(0.1f)
+        // let defaultStrategy = MutationStrategy.Kelemen(1f / 1024f, 1f / 16f)
+        PSSMLTIntegrator(1024 * 1024, 256 * 1024, mutationPerPixel, defaultStrategy, 0.5f)
     member this.MaxDepth = 8
     member this.RRDepth = 5
     member this.RRThreshold = 0.95f
     member this.NBootstrap = nBootstrap
     member this.NChains = nChains
-    member this.Sigma = sigma
+    member this.Strategy = strategy
     member this.LargeStepProb = largeStepProb
 
     member inline this.Li
@@ -178,7 +197,7 @@ type MetropolisIntegrator
                     let shadowRay = interaction.SpawnRay(lightSample.wi)
                     let lightDistance = (lightSample.eval.p - interaction.Position).Length()
 
-                    if lightSample.eval.pdf <> 0f && not (aggregate.Intersect(&shadowRay, lightDistance - 1e-3f)) then
+                    if lightSample.eval.pdf <> 0f && not (aggregate.Intersect(&shadowRay, lightDistance - 1e-2f)) then
                         bsdfSample.eval <- interaction.EvalBSDF(-ray.Direction, lightSample.wi)
 
                         L <- Vector3.FusedMultiplyAdd(beta * bsdfSample.eval.bsdf,
@@ -216,7 +235,7 @@ type MetropolisIntegrator
         let nBootstrapPerTile = int ((uint64 this.NBootstrap * tileSize + imageSize - 1uL) / imageSize)
         let bootstrapWeights = Array.zeroCreate<float32> nBootstrapPerTile
         let xs = NativePtr.stackalloc<PrimarySample> (4 + 6 * this.MaxDepth)
-        let mutable mltSampler = MLTSampler(Sampler(), this.LargeStepProb, this.Sigma, xs)
+        let mutable mltSampler = MLTSampler(Sampler(), this.LargeStepProb, this.Strategy, xs)
         for bootstrapId = 0 to bootstrapWeights.Length - 1 do
             mltSampler.Reset()
             mltSampler.InnerSampler <- Sampler(uint (bootstrapId + nBootstrapPerTile * this.FrameId), uint tx, uint ty)
@@ -273,6 +292,6 @@ type MetropolisIntegrator
                     mltSampler.Accept()
                 else
                     if accept > 0f then
-                         film.Accumulate(pixelIdNew, (wNew * invEffectiveSamplePerPixel) * LNew)
+                        film.Accumulate(pixelIdNew, (wNew * invEffectiveSamplePerPixel) * LNew)
                     mltSampler.Reject()
             film.Accumulate(pixelId, radiance * invEffectiveSamplePerPixel)
