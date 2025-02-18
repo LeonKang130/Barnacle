@@ -4,7 +4,7 @@
 
 Barnacle is a toy renderer written in F# as part of UCSB 2025W CS263 course project. Here is a sample image rendered by Barnacle:
 
-![Path-Traced GI](./sample.png)
+![Path-Traced GI](./Sample - Path Tracing.png)
 
 ## Roadmap
 
