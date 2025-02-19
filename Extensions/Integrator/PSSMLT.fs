@@ -54,16 +54,8 @@ type MLTSampler =
             InitializedSampleCount = 0
         }
     
-    member inline this.Reset() =
-        this.LargeStep <- false
-        this.LastLargeStepIteration <- 0
-        this.CurrentIteration <- 0
-        this.SampleIndex <- 0
-        this.InitializedSampleCount <- 0
-    
-    member inline this.RandomAccess(i: int) =
-        let xs = NativePtr.toByRef this.Xs
-        &Unsafe.Add(&xs, i)
+    member inline this.Item with get(index: int) =
+        &Unsafe.Add(NativePtr.toByRef this.Xs, index)
     
     member inline this.StartIteration() =
         this.LargeStep <- this.CurrentIteration = 0 || this.InnerSampler.Next1D() < this.LargeStepProb
@@ -103,7 +95,7 @@ type MLTSampler =
                 p <- MathF.FusedMultiplyAdd(p, w, 1.00167406f)
                 MathF.FusedMultiplyAdd(p, w, 2.83297682f) * x
 
-        let x = &this.RandomAccess(index)
+        let x = &this[index]
         if this.InitializedSampleCount <= index then
             x <- Unchecked.defaultof<PrimarySample>
             this.InitializedSampleCount <- index + 1
@@ -147,7 +139,7 @@ type MLTSampler =
 
     member inline this.Reject() =
         for i = 0 to this.InitializedSampleCount - 1 do
-            this.RandomAccess(i).Restore()
+            this[i].Restore()
 
         this.CurrentIteration <- this.CurrentIteration - 1
 
@@ -186,7 +178,6 @@ type PSSMLTIntegrator
         let mutable t = Unchecked.defaultof<float32>
         let mutable lightSample = Unchecked.defaultof<LightSample>
         let mutable bsdfSample = Unchecked.defaultof<BSDFSample>
-        bsdfSample.eval.pdf <- 1e5f
 
         while depth < this.MaxDepth do
             t <- infinityf
@@ -196,7 +187,9 @@ type PSSMLTIntegrator
             else
                 if interaction.HasLight then
                     lightSample.eval <- lightSampler.Eval(ray.Origin, &interaction)
-                    let misWeight = bsdfSample.eval.pdf * MathF.ReciprocalEstimate(lightSample.eval.pdf + bsdfSample.eval.pdf)
+                    let misWeight =
+                        if depth = 0 then 1f
+                        else bsdfSample.eval.pdf * MathF.ReciprocalEstimate(lightSample.eval.pdf + bsdfSample.eval.pdf)
                     L <- Vector3.FusedMultiplyAdd(beta, lightSample.eval.L * misWeight, L)
                 if interaction.HasMaterial then
                     lightSample <- lightSampler.Sample(interaction.Position, sampler.Next1D(), sampler.Next2D())

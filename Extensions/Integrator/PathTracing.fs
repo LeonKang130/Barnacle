@@ -24,7 +24,7 @@ type PathTracingIntegrator(spp: int, maxDepth: int, rrDepth: int) =
         let mutable t = Unchecked.defaultof<float32>
         let mutable lightSample = Unchecked.defaultof<LightSample>
         let mutable bsdfSample = Unchecked.defaultof<BSDFSample>
-        bsdfSample.eval.pdf <- 1e5f
+
         while depth < this.MaxDepth do
             t <- infinityf
             if not (aggregate.Intersect(&ray, &interaction, &t)) then
@@ -32,7 +32,9 @@ type PathTracingIntegrator(spp: int, maxDepth: int, rrDepth: int) =
             else
                 if interaction.HasLight then
                     lightSample.eval <- lightSampler.Eval(ray.Origin, &interaction)
-                    let misWeight = bsdfSample.eval.pdf * MathF.ReciprocalEstimate(lightSample.eval.pdf + bsdfSample.eval.pdf)
+                    let misWeight =
+                        if depth = 0 then 1f
+                        else bsdfSample.eval.pdf * MathF.ReciprocalEstimate(lightSample.eval.pdf + bsdfSample.eval.pdf)
                     L <- Vector3.FusedMultiplyAdd(beta, lightSample.eval.L * misWeight, L)
                 if interaction.HasMaterial then
                     lightSample <- lightSampler.Sample(interaction.Position, sampler.Next1D(), sampler.Next2D())

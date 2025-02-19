@@ -139,14 +139,15 @@ type Interaction =
         this.Material.Eval(wo, wi, this.geom.uv)
 
     member inline this.SampleBSDF(wo: Vector3, uBSDF: Vector2) : BSDFSample =
-        let wo = this.geom.onb.WorldToLocal(wo)
-        let mutable sample = this.Material.Sample(wo, this.UV, uBSDF)
-        sample.wi <- this.geom.onb.LocalToWorld(sample.wi)
-        sample
+        let sample = this.Material.Sample(this.geom.onb.WorldToLocal(wo), this.UV, uBSDF)
+        { sample with wi = this.geom.onb.LocalToWorld(sample.wi) }
 
     member inline this.EvalEmit(wo: Vector3) : Vector3 =
-        let wo = this.geom.onb.WorldToLocal(wo)
-        this.Light.Eval(wo, this.UV)
+        this.Light.Eval(this.geom.onb.WorldToLocal(wo), this.UV)
+    
+    member inline this.SampleEmit(uEmit: Vector2) : LightSample =
+        let sample = this.Light.SampleEmit(uEmit)
+        { eval = { sample.eval with p = this.Position }; wi = this.geom.onb.LocalToWorld(sample.wi) }
 
 and [<AbstractClass>] PrimitiveInstance
     (primitive: ElementalPrimitive, material: MaterialBase option, light: LightBase option) =

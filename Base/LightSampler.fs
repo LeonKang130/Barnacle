@@ -9,5 +9,6 @@ type LightSamplerBase(primitiveInstances: PrimitiveInstance array) =
         failwith "LightSamplerBase: No light primitives found."
     member this.Instances = instances
     abstract member Sample: Vector3 * float32 * Vector2 -> LightSample
+    abstract member SampleEmit: float32 * Vector2 * Vector2 -> LightSample
     abstract member Eval: Vector3 * Interaction inref -> LightEval
 

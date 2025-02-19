@@ -74,10 +74,6 @@ type internal Triangle(p0: Vector3, p1: Vector3, p2: Vector3) =
 
                     if t' > eps && t' < t then
                         let mutable n = Vector3.Normalize(Vector3.Cross(e0, e1))
-
-                        if Vector3.Dot(n, ray.Direction) > 0f then
-                            n <- -n
-
                         let p = ray.PointAt t'
                         geom <- LocalGeometry(p, n, Vector2(u, v))
                         t <- t'
@@ -126,8 +122,7 @@ module private BLASTraversal =
         NativePtr.toByRef p
     
     let inline stackPush<'a when 'a: unmanaged> (stack: 'a byref, stackTop: int byref, value: 'a) =
-        let stackTopElement = &Unsafe.Add(&stack, stackTop)
-        stackTopElement <- value
+        Unsafe.Add(&stack, stackTop) <- value
         stackTop <- stackTop + 1
     
     let inline stackPop<'a when 'a: unmanaged> (stack: 'a byref, stackTop: int byref) : 'a =
@@ -141,9 +136,9 @@ type MeshPrimitive(vertices: Vector3 array, indices: int array) =
     let triangleIndices =
         Array.init (indices.Length / 3) (fun i -> TriangleIndex(indices[i * 3], indices[i * 3 + 1], indices[i * 3 + 2]))
 
-    member val private TriangleIndices = triangleIndices with get
+    member val TriangleIndices = triangleIndices with get
 
-    member val private BVHNodes =
+    member val BVHNodes =
         let builder = BVHBuilder.Default
 
         if builder.Config.MaxDepth > 128 then
@@ -160,10 +155,10 @@ type MeshPrimitive(vertices: Vector3 array, indices: int array) =
                 AxisAlignedBoundingBox(pMin, pMax))
         ) with get
 
-    member private this.Vertices = vertices
+    member this.Vertices = vertices
     member this.TriangleCount = this.TriangleIndices.Length
 
-    member inline internal this.FetchTriangle(i: int) =
+    member inline internal this.Item(i: int) =
         let triangleIndices = &MemoryMarshal.GetArrayDataReference this.TriangleIndices
         let triangleIndex = Unsafe.Add(&triangleIndices, i)
         let vertices = &MemoryMarshal.GetArrayDataReference this.Vertices
@@ -195,7 +190,7 @@ type MeshPrimitive(vertices: Vector3 array, indices: int array) =
                     let mutable instanceId = node.InstanceOffset
 
                     while not hit && instanceId < node.InstanceOffset + node.InstanceCount do
-                        let triangle = this.FetchTriangle(instanceId)
+                        let triangle = this[instanceId]
                         if triangle.Bounds.Intersect(&ray, t) then
                             hit <- triangle.Intersect(&ray, t)
                         instanceId <- instanceId + 1
@@ -223,7 +218,7 @@ type MeshPrimitive(vertices: Vector3 array, indices: int array) =
             if node.Bounds.Intersect(&ray, t) then
                 if node.IsLeaf then
                     for instanceId = node.InstanceOffset to node.InstanceOffset + node.InstanceCount - 1 do
-                        let triangle = this.FetchTriangle(instanceId)
+                        let triangle = this[instanceId]
                         if triangle.Bounds.Intersect(&ray, t) then
                             hit <- triangle.Intersect(&ray, &geom, &t) || hit
                 else
@@ -283,7 +278,7 @@ type MeshInstance(mesh: MeshPrimitive, material: MaterialBase option, light: Lig
 
     override this.Sample(uSelect: float32, uSurface: Vector2) =
         let i, pdfTriangle = this.Instance.AliasTable.Sample(uSelect)
-        let mutable triangle = this.Instance.FetchTriangle(i)
+        let mutable triangle = this.Instance[i]
         triangle <- Triangle.Transform(&triangle, this.ObjectToWorld)
         let mutable interaction = Unchecked.defaultof<Interaction>
         let mutable geom, pdfArea = triangle.Sample(uSurface)
@@ -294,6 +289,6 @@ type MeshInstance(mesh: MeshPrimitive, material: MaterialBase option, light: Lig
 
     override this.EvalPDF(interaction: Interaction inref) =
         let i = interaction.geom.tag
-        let mutable triangle = this.Instance.FetchTriangle(i)
+        let mutable triangle = this.Instance[i]
         triangle <- Triangle.Transform(&triangle, this.ObjectToWorld)
         1f / float32 this.Instance.TriangleCount * triangle.SurfaceArea

@@ -27,6 +27,16 @@ type UniformLightSampler(primitiveInstances: PrimitiveInstance array) =
             }
             wi = -wo
         }
+    
+    override this.SampleEmit(uSelect: float32, uLight: Vector2, uEmit: Vector2) =
+        let mutable uSelect = uSelect * float32 this.Instances.Length
+        let primitiveId = min (int uSelect) (this.Instances.Length - 1)
+        uSelect <- uSelect - float32 primitiveId
+        let struct (interaction, pdfSurface) =
+            Unsafe.Add(&MemoryMarshal.GetArrayDataReference this.Instances, primitiveId).Sample(uSelect, uLight)
+        let sample = interaction.SampleEmit(uEmit)
+        { sample with eval.pdf = pdfSurface * sample.eval.pdf / float32 this.Instances.Length }
+    
     override this.Eval(p: Vector3, interaction: Interaction inref) =
         let wo = Vector3.Normalize(p - interaction.Position)
         let cosWo = Vector3.Dot(interaction.Normal, wo)

@@ -10,9 +10,9 @@ module private TLASTraversal =
     let inline stackalloc<'a when 'a: unmanaged> (length: int): 'a byref =
         let p = NativePtr.stackalloc<'a> length
         NativePtr.toByRef p
+
     let inline stackPush<'a when 'a: unmanaged> (stack: 'a byref, stackTop: int byref, value: 'a) =
-        let stackTopElement = &Unsafe.Add(&stack, stackTop)
-        stackTopElement <- value
+        Unsafe.Add(&stack, stackTop) <- value
         stackTop <- stackTop + 1
     
     let inline stackPop<'a when 'a: unmanaged> (stack: 'a byref, stackTop: int byref) : 'a =

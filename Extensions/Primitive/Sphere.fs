@@ -66,13 +66,10 @@ type SpherePrimitive(radius: float32) =
                 if t1 > eps && t1 < t then
                     t <- t1
                     let p = ray.PointAt t
-                    let mutable n = Vector3.Normalize(p)
+                    let n = Vector3.Normalize(p)
 
                     let uv =
                         Vector2(MathF.Atan2(n.Z, n.X) / (2f * MathF.PI) + 0.5f, MathF.Acos(n.Y) / MathF.PI)
-
-                    if Vector3.Dot(n, ray.Direction) > 0f then
-                        n <- -n
 
                     geom <- LocalGeometry(p, n, uv)
                     true
