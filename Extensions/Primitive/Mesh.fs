@@ -219,8 +219,9 @@ type MeshPrimitive(vertices: Vector3 array, indices: int array) =
                 if node.IsLeaf then
                     for instanceId = node.InstanceOffset to node.InstanceOffset + node.InstanceCount - 1 do
                         let triangle = this[instanceId]
-                        if triangle.Bounds.Intersect(&ray, t) then
-                            hit <- triangle.Intersect(&ray, &geom, &t) || hit
+                        if triangle.Bounds.Intersect(&ray, t) && triangle.Intersect(&ray, &geom, &t) then
+                            geom.tag <- instanceId
+                            hit <- true
                 else
                     if ray.Direction[node.SplitAxis] > 0f then
                         BLASTraversal.stackPush(&traversalStack, &stackTop, node.RightChild)
@@ -291,4 +292,4 @@ type MeshInstance(mesh: MeshPrimitive, material: MaterialBase option, light: Lig
         let i = interaction.geom.tag
         let mutable triangle = this.Instance[i]
         triangle <- Triangle.Transform(&triangle, this.ObjectToWorld)
-        1f / float32 this.Instance.TriangleCount * triangle.SurfaceArea
+        this.Instance.AliasTable.Table[i].pdf / triangle.SurfaceArea
