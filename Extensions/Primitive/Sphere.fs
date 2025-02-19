@@ -95,8 +95,8 @@ type SphereInstance(sphere: SpherePrimitive, material: MaterialBase option, ligh
 
     override this.Sample(_, uSurface: Vector2) =
         let struct (sinTheta, cosTheta) = MathF.SinCos(2f * MathF.PI * uSurface.X)
-        let cosPhi = 1f - 2f * uSurface.Y
-        let sinPhi = MathF.Sqrt(1f - cosPhi * cosPhi)
+        let cosPhi = Single.FusedMultiplyAdd(-2f, uSurface.Y, 1f)
+        let sinPhi = MathF.Sqrt(Single.FusedMultiplyAdd(-cosPhi, cosPhi, 1f))
 
         let n =
             Vector3(cosTheta * sinPhi, sinTheta * sinPhi, cosPhi)

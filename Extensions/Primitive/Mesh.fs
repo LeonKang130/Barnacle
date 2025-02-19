@@ -17,8 +17,8 @@ type internal Triangle(p0: Vector3, p1: Vector3, p2: Vector3) =
     member this.P2 = p2
     
     member inline this.Bounds =
-        let pMin = Vector3.Min(Vector3.Min(p0, p1), p2)
-        let pMax = Vector3.Max(Vector3.Max(p0, p1), p2)
+        let pMin = Vector3.MinNative(Vector3.MinNative(p0, p1), p2)
+        let pMax = Vector3.MaxNative(Vector3.MaxNative(p0, p1), p2)
         AxisAlignedBoundingBox(pMin, pMax)
 
     member inline this.Intersect(ray: Ray inref, t: float32) =
@@ -89,9 +89,9 @@ type internal Triangle(p0: Vector3, p1: Vector3, p2: Vector3) =
     member inline this.Sample(uSurface: Vector2) =
         let uv =
             if uSurface.X < uSurface.Y then
-                Vector2(0.5f * uSurface.X, uSurface.Y - 0.5f * uSurface.X)
+                Vector2(0.5f * uSurface.X, Single.FusedMultiplyAdd(-0.5f, uSurface.X, uSurface.Y))
             else
-                Vector2(uSurface.X - 0.5f * uSurface.Y, 0.5f * uSurface.Y)
+                Vector2(Single.FusedMultiplyAdd(-0.5f, uSurface.Y, uSurface.X), 0.5f * uSurface.Y)
 
         let p = uv.X * this.P1 + uv.Y * this.P2 + (1f - uv.X - uv.Y) * this.P0
         let n = Vector3.Cross(this.P1 - this.P0, this.P2 - this.P0)
@@ -150,8 +150,8 @@ type MeshPrimitive(vertices: Vector3 array, indices: int array) =
                 let p0 = vertices[triangleIndex.I0]
                 let p1 = vertices[triangleIndex.I1]
                 let p2 = vertices[triangleIndex.I2]
-                let pMin = Vector3.Min(Vector3.Min(p0, p1), p2)
-                let pMax = Vector3.Max(Vector3.Max(p0, p1), p2)
+                let pMin = Vector3.MinNative(Vector3.MinNative(p0, p1), p2)
+                let pMax = Vector3.MaxNative(Vector3.MaxNative(p0, p1), p2)
                 AxisAlignedBoundingBox(pMin, pMax))
         ) with get
 

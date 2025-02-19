@@ -3,7 +3,6 @@
 open System
 open System.Numerics
 open System.Runtime.CompilerServices
-open System.Runtime.Intrinsics
 
 [<IsReadOnly; Struct>]
 type AxisAlignedBoundingBox =
@@ -31,10 +30,10 @@ type AxisAlignedBoundingBox =
         let mutable tMax = t
         let t0 = (this.pMin - ray.Origin) * invDir
         let t1 = (this.pMax - ray.Origin) * invDir
-        let t0' = Vector3.Min(t0, t1)
-        let t1' = Vector3.Max(t0, t1)
-        tMin <- MathF.Max(tMin, MathF.Max(t0'.X, MathF.Max(t0'.Y, t0'.Z)))
-        tMax <- MathF.Min(tMax, MathF.Min(t1'.X, MathF.Min(t1'.Y, t1'.Z)))
+        let t0' = Vector3.MinNative(t0, t1)
+        let t1' = Vector3.MaxNative(t0, t1)
+        tMin <- Math.Max(tMin, Math.Max(t0'.X, Math.Max(t0'.Y, t0'.Z)))
+        tMax <- Math.Min(tMax, Math.Min(t1'.X, Math.Min(t1'.Y, t1'.Z)))
         tMin <= tMax
 
     static member inline Transform(aabb: AxisAlignedBoundingBox inref, m: Matrix4x4) =
@@ -45,17 +44,17 @@ type AxisAlignedBoundingBox =
             let pY = if i &&& 2 = 0 then aabb.pMin.Y else aabb.pMax.Y
             let pZ = if i &&& 4 = 0 then aabb.pMin.Z else aabb.pMax.Z
             let p = Vector3.Transform(Vector3(pX, pY, pZ), m)
-            pMin <- Vector3.Min(pMin, p)
-            pMax <- Vector3.Max(pMax, p)
+            pMin <- Vector3.MinNative(pMin, p)
+            pMax <- Vector3.MaxNative(pMax, p)
 
         AxisAlignedBoundingBox(pMin, pMax)
     static member inline Transform(aabb: AxisAlignedBoundingBox, m: Matrix4x4) =
         AxisAlignedBoundingBox.Transform(&aabb, m)
     
     static member inline Union(a: AxisAlignedBoundingBox, b: AxisAlignedBoundingBox) =
-        AxisAlignedBoundingBox(Vector3.Min(a.pMin, b.pMin), Vector3.Max(a.pMax, b.pMax))
+        AxisAlignedBoundingBox(Vector3.MinNative(a.pMin, b.pMin), Vector3.MaxNative(a.pMax, b.pMax))
     static member inline Union(a: AxisAlignedBoundingBox, b: Vector3) =
-        AxisAlignedBoundingBox(Vector3.Min(a.pMin, b), Vector3.Max(a.pMax, b))
+        AxisAlignedBoundingBox(Vector3.MinNative(a.pMin, b), Vector3.MaxNative(a.pMax, b))
     static member Default = AxisAlignedBoundingBox(Vector3.PositiveInfinity, Vector3.NegativeInfinity)
 
 [<IsReadOnly; Struct>]
@@ -133,21 +132,22 @@ type Interaction =
     member this.Light: LightBase = this.inst.Light
     member inline this.SpawnRay(wo: Vector3) = Ray(this.Position, wo)
 
-    member inline this.EvalBSDF(wo: Vector3, wi: Vector3) : BSDFEval =
-        let wo = this.geom.onb.WorldToLocal(wo)
-        let wi = this.geom.onb.WorldToLocal(wi)
-        this.Material.Eval(wo, wi, this.geom.uv)
+    member inline this.EvalBSDF(wo: Vector3, wi: Vector3) =
+        this.Material.Eval(this.geom.onb.WorldToLocal(wo), this.geom.onb.WorldToLocal(wi), this.geom.uv)
 
-    member inline this.SampleBSDF(wo: Vector3, uBSDF: Vector2) : BSDFSample =
-        let sample = this.Material.Sample(this.geom.onb.WorldToLocal(wo), this.UV, uBSDF)
-        { sample with wi = this.geom.onb.LocalToWorld(sample.wi) }
+    member inline this.SampleBSDF(wo: Vector3, uBSDF: Vector2) =
+        let mutable sample = this.Material.Sample(this.geom.onb.WorldToLocal(wo), this.UV, uBSDF)
+        sample.wi <- this.geom.onb.LocalToWorld(sample.wi)
+        sample
 
     member inline this.EvalEmit(wo: Vector3) : Vector3 =
         this.Light.Eval(this.geom.onb.WorldToLocal(wo), this.UV)
     
-    member inline this.SampleEmit(uEmit: Vector2) : LightSample =
-        let sample = this.Light.SampleEmit(uEmit)
-        { eval = { sample.eval with p = this.Position }; wi = this.geom.onb.LocalToWorld(sample.wi) }
+    member inline this.SampleEmit(uEmit: Vector2) =
+        let mutable sample = this.Light.SampleEmit(uEmit)
+        sample.eval.p <- this.Position
+        sample.wi <- this.geom.onb.LocalToWorld(sample.wi)
+        sample
 
 and [<AbstractClass>] PrimitiveInstance
     (primitive: ElementalPrimitive, material: MaterialBase option, light: LightBase option) =
