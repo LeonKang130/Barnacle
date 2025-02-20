@@ -7,18 +7,21 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="Util\Allocation.fs" />
+    <Compile Include="Util\AliasTable.fs" />
+    <Compile Include="Util\BVH.fs" />
+    <Compile Include="Util\Hash.fs" />
+    <Compile Include="Util\Transform.fs" />
     <Compile Include="Base\Ray.fs" />
     <Compile Include="Base\Sampler.fs" />
     <Compile Include="Base\Camera.fs" />
     <Compile Include="Base\Material.fs" />
     <Compile Include="Base\Light.fs" />
     <Compile Include="Base\Primitive.fs" />
-    <Compile Include="Base\BVH.fs" />
     <Compile Include="Base\Film.fs" />
     <Compile Include="Base\LightSampler.fs" />
     <Compile Include="Base\Integrator.fs" />
     <Compile Include="Base\Scene.fs" />
-    <Compile Include="Base\AliasTable.fs" />
     <Compile Include="Extensions\Primitive\Sphere.fs" />
     <Compile Include="Extensions\Primitive\Mesh.fs" />
     <Compile Include="Extensions\Camera\Pinhole.fs" />

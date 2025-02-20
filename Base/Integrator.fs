@@ -2,6 +2,7 @@
 
 open System
 open System.Numerics
+open System.Collections.Concurrent
 open System.Threading.Tasks
 
 [<AbstractClass>]
@@ -45,6 +46,10 @@ type ProgressiveIntegrator(spp: int, tileSize: int) =
     override this.Render(camera: CameraBase, film: Film, aggregate: PrimitiveAggregate, lightSampler: LightSamplerBase) =
         let tileXCount = (film.ImageWidth + this.TileSize - 1) / this.TileSize
         let tileYCount = (film.ImageHeight + this.TileSize - 1) / this.TileSize
-        Parallel.For(0, tileXCount * tileYCount, fun tileIdx ->
-            this.RenderTile(tileIdx % tileXCount, tileIdx / tileXCount, camera, film, aggregate, lightSampler)) |> ignore
+        let partitioner = Partitioner.Create(0, tileXCount * tileYCount)
+        Parallel.ForEach(partitioner, (fun range _ ->
+            let first, last = range
+            for tileId = first to last - 1 do
+                this.RenderTile(tileId % tileXCount, tileId / tileXCount, camera, film, aggregate, lightSampler))
+        ) |> ignore
         this.FrameId <- this.FrameId + 1

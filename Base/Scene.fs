@@ -1,18 +1,9 @@
 ﻿namespace Barnacle.Base
 
+open Barnacle.Util
 open System
 open System.Numerics
 open Microsoft.FSharp.Core
-
-module private SceneTransformUtil =
-    let inline Compose(s: Vector3, r: Quaternion, t: Vector3) =
-        Matrix4x4.CreateTranslation(s) * Matrix4x4.CreateFromQuaternion(r) * Matrix4x4.CreateScale(t)
-    let inline Decompose(m: Matrix4x4) =
-        let mutable s = Vector3.Zero
-        let mutable r = Quaternion.Identity
-        let mutable t = Vector3.Zero
-        Matrix4x4.Decompose(m, &s, &r, &t) |> ignore
-        s, r, t
 
 [<Struct>]
 type KeyFrame =
@@ -21,12 +12,12 @@ type KeyFrame =
     new(time: float32, matrix: Matrix4x4) = { Time = time; Matrix = matrix }
     static member inline Interpolate(a: KeyFrame inref, b: KeyFrame inref, t: float32) =
         let ratio = (t - a.Time) / (b.Time - a.Time)
-        let t1, r1, s1 = SceneTransformUtil.Decompose(a.Matrix)
-        let t2, r2, s2 = SceneTransformUtil.Decompose(b.Matrix)
+        let s1, r1, t1 = Transform.Decompose(a.Matrix)
+        let s2, r2, t2 = Transform.Decompose(b.Matrix)
         let translation = Vector3.Lerp(t1, t2, ratio)
         let rotation = Quaternion.Slerp(r1, r2, ratio)
         let scale = Vector3.Lerp(s1, s2, ratio)
-        SceneTransformUtil.Compose(scale, rotation, translation)
+        Transform.Compose(scale, rotation, translation)
 
 type Transform(keyFrames: KeyFrame array) =
     do if keyFrames.Length = 0 then raise (ArgumentException "KeyFrames cannot be empty")

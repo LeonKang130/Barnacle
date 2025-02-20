@@ -6,7 +6,7 @@ open System.Numerics
 [<Sealed>]
 type NormalIntegrator(spp: int) =
     inherit ProgressiveIntegrator(spp)
-    override this.Li(ray: Ray inref, aggregate: PrimitiveAggregate, _, sampler: Sampler byref) =
+    override this.Li(ray: Ray inref, aggregate: PrimitiveAggregate, _, _) =
         let mutable t = infinityf
         let mutable interaction = Unchecked.defaultof<Interaction>
         if aggregate.Intersect(&ray, &interaction, &t) then

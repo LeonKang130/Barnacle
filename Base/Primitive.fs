@@ -1,61 +1,9 @@
 ﻿namespace Barnacle.Base
 
+open Barnacle.Util
 open System
 open System.Numerics
 open System.Runtime.CompilerServices
-
-[<IsReadOnly; Struct>]
-type AxisAlignedBoundingBox =
-    val pMin: Vector3
-    val pMax: Vector3
-    new(pMin: Vector3, pMax: Vector3) = { pMin = pMin; pMax = pMax }
-    member inline this.Center = 0.5f * (this.pMin + this.pMax)
-    member inline this.Diagonal = this.pMax - this.pMin
-
-    member inline this.SurfaceArea =
-        let diag = this.Diagonal
-        2f * (diag.X * diag.Y + diag.Y * diag.Z + diag.Z * diag.X)
-
-    member inline this.Volume =
-        let diag = this.Diagonal
-        diag.X * diag.Y * diag.Z
-    member inline this.SplitAxis =
-        let diag = this.Diagonal
-        if diag.X >= diag.Y && diag.X >= diag.Z then 0
-        elif diag.Y >= diag.Z then 1 else 2
-
-    member inline this.Intersect(ray: Ray inref, t: float32) : bool =
-        let invDir = Vector3.One / ray.Direction
-        let mutable tMin = 1e-3f
-        let mutable tMax = t
-        let t0 = (this.pMin - ray.Origin) * invDir
-        let t1 = (this.pMax - ray.Origin) * invDir
-        let t0' = Vector3.MinNative(t0, t1)
-        let t1' = Vector3.MaxNative(t0, t1)
-        tMin <- Math.Max(tMin, Math.Max(t0'.X, Math.Max(t0'.Y, t0'.Z)))
-        tMax <- Math.Min(tMax, Math.Min(t1'.X, Math.Min(t1'.Y, t1'.Z)))
-        tMin <= tMax
-
-    static member inline Transform(aabb: AxisAlignedBoundingBox inref, m: Matrix4x4) =
-        let mutable pMin, pMax = Vector3.PositiveInfinity, Vector3.NegativeInfinity
-
-        for i = 0 to 7 do
-            let pX = if i &&& 1 = 0 then aabb.pMin.X else aabb.pMax.X
-            let pY = if i &&& 2 = 0 then aabb.pMin.Y else aabb.pMax.Y
-            let pZ = if i &&& 4 = 0 then aabb.pMin.Z else aabb.pMax.Z
-            let p = Vector3.Transform(Vector3(pX, pY, pZ), m)
-            pMin <- Vector3.MinNative(pMin, p)
-            pMax <- Vector3.MaxNative(pMax, p)
-
-        AxisAlignedBoundingBox(pMin, pMax)
-    static member inline Transform(aabb: AxisAlignedBoundingBox, m: Matrix4x4) =
-        AxisAlignedBoundingBox.Transform(&aabb, m)
-    
-    static member inline Union(a: AxisAlignedBoundingBox, b: AxisAlignedBoundingBox) =
-        AxisAlignedBoundingBox(Vector3.MinNative(a.pMin, b.pMin), Vector3.MaxNative(a.pMax, b.pMax))
-    static member inline Union(a: AxisAlignedBoundingBox, b: Vector3) =
-        AxisAlignedBoundingBox(Vector3.MinNative(a.pMin, b), Vector3.MaxNative(a.pMax, b))
-    static member Default = AxisAlignedBoundingBox(Vector3.PositiveInfinity, Vector3.NegativeInfinity)
 
 [<IsReadOnly; Struct>]
 type OrthonormalBasis =
@@ -196,25 +144,4 @@ and [<AbstractClass>] PrimitiveInstance
 type PrimitiveAggregate() =
     abstract member Intersect: Ray inref * float32 -> bool
     abstract member Intersect: Ray inref * Interaction outref * float32 byref -> bool
-
-[<Sealed>]
-type ListAggregate(instances: PrimitiveInstance array) =
-    inherit PrimitiveAggregate()
-
-    override this.Intersect(ray: Ray inref, t: float32) =
-        let mutable hit = false
-        let mutable instanceId = 0
-
-        while not hit && instanceId < instances.Length do
-            hit <- instances[instanceId].Intersect(&ray, t)
-            instanceId <- instanceId + 1
-
-        hit
-
-    override this.Intersect(ray: Ray inref, interaction: Interaction outref, t: float32 byref) =
-        let mutable hit = false
-
-        for instance in instances do
-            hit <- instance.Intersect(&ray, &interaction, &t) || hit
-
-        hit
+    abstract member Bounds: AxisAlignedBoundingBox

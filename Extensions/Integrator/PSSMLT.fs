@@ -1,13 +1,16 @@
 ﻿#nowarn "9"
 namespace Barnacle.Extensions.Integrator
 
-open System.Threading
+
 open Barnacle.Base
+open Barnacle.Util
 open System
+open System.Collections.Concurrent
 open System.Numerics
 open System.Runtime.CompilerServices
-open Microsoft.FSharp.NativeInterop
+open System.Threading
 open System.Threading.Tasks
+open Microsoft.FSharp.NativeInterop
 
 [<IsReadOnly; Struct>]
 type MutationStrategy =
@@ -34,7 +37,7 @@ type MLTSampler =
     val mutable InnerSampler: Sampler
     val LargeStepProb: float32
     val Strategy: MutationStrategy
-    val Xs: nativeptr<PrimarySample>
+    val Xs: PrimarySample nativeptr
     val mutable LargeStep: bool
     val mutable LastLargeStepIteration: int
     val mutable CurrentIteration: int
@@ -53,9 +56,6 @@ type MLTSampler =
             SampleIndex = 0
             InitializedSampleCount = 0
         }
-    
-    member inline this.Item with get(index: int) =
-        &Unsafe.Add(NativePtr.toByRef this.Xs, index)
     
     member inline this.StartIteration() =
         this.LargeStep <- this.CurrentIteration = 0 || this.InnerSampler.Next1D() < this.LargeStepProb
@@ -95,7 +95,7 @@ type MLTSampler =
                 p <- MathF.FusedMultiplyAdd(p, w, 1.00167406f)
                 MathF.FusedMultiplyAdd(p, w, 2.83297682f) * x
 
-        let x = &this[index]
+        let x = &Allocation.StackRead(this.Xs, index)
         if this.InitializedSampleCount <= index then
             x <- Unchecked.defaultof<PrimarySample>
             this.InitializedSampleCount <- index + 1
@@ -139,7 +139,7 @@ type MLTSampler =
 
     member inline this.Reject() =
         for i = 0 to this.InitializedSampleCount - 1 do
-            this[i].Restore()
+            Allocation.StackRead(this.Xs, i).Restore()
 
         this.CurrentIteration <- this.CurrentIteration - 1
 
@@ -220,7 +220,7 @@ type PSSMLTIntegrator
 
         L
 
-    member inline this.BootstrapSingleChain(bootstrapId: int, camera: CameraBase, film: Film, aggregate: PrimitiveAggregate, lightSampler: LightSamplerBase) =
+    member this.BootstrapSingleChain(bootstrapId: int, camera: CameraBase, film: Film, aggregate: PrimitiveAggregate, lightSampler: LightSamplerBase) =
         let struct (imageWidth, imageHeight) = film.Resolution
         let xs = NativePtr.stackalloc<PrimarySample> (4 + 6 * this.MaxDepth)
         let mutable mltSampler = MLTSampler(Sampler(uint this.FrameId, uint bootstrapId), this.LargeStepProb, this.Strategy, xs)
@@ -234,9 +234,9 @@ type PSSMLTIntegrator
         let y = Vector3.Dot(L, Vector3(0.2126f, 0.7152f, 0.0722f))
         this.BootstrapWeights[bootstrapId] <- y
     
-    member inline this.RenderSingleChain(chainId: int, bootstrapSamplingTable: AliasTable, camera: CameraBase, film: Film, aggregate: PrimitiveAggregate, lightSampler: LightSamplerBase) =
+    member this.RenderSingleChain(chainId: int, bootstrapSamplingTable: AliasTable, camera: CameraBase, film: Film, aggregate: PrimitiveAggregate, lightSampler: LightSamplerBase) =
         let struct (imageWidth, imageHeight) = film.Resolution
-        let xs = NativePtr.stackalloc<PrimarySample> (4 + 6 * this.MaxDepth)
+        let xs = Allocation.StackAlloc<PrimarySample> (4 + 6 * this.MaxDepth)
         let mutable sampler = Sampler(uint this.FrameId, uint chainId)
         let bootstrapId, _ = bootstrapSamplingTable.Sample(sampler.Next1D())
         let mutable mltSampler = MLTSampler(Sampler(uint this.FrameId, uint bootstrapId), this.LargeStepProb, this.Strategy, xs)
@@ -290,21 +290,23 @@ type PSSMLTIntegrator
         this.AcceptedMutationCount <- 0
         this.ProposedMutationCount <- 0
         let dispatchSize = 32
-        let bootstrapDispatchCount = (this.NBootstrap + dispatchSize - 1) / dispatchSize
-        let inline bootstrap(dispatchId: int) =
-            for bootstrapId = dispatchId * dispatchSize to min (this.NBootstrap - 1) ((dispatchId + 1) * dispatchSize - 1) do
-                this.BootstrapSingleChain(bootstrapId, camera, film, aggregate, lightSampler)
-        Parallel.For(0, bootstrapDispatchCount, bootstrap) |> ignore
+        let partitioner = Partitioner.Create(0, this.NBootstrap)
+        Parallel.ForEach(partitioner, (fun range _ ->
+            let first, last = range
+            for bootstrapId = first to last - 1 do
+                this.BootstrapSingleChain(bootstrapId, camera, film, aggregate, lightSampler))
+        ) |> ignore
         this.B <- Array.average this.BootstrapWeights
         if this.B = 0f then
             printfn "Warning: all bootstrap samples are zero, exiting..."
         else
             let bootstrapSamplingTable = AliasTable(this.BootstrapWeights)
-            let chainDispatchCount = (this.NChains + dispatchSize - 1) / dispatchSize
-            let inline chain(dispatchId: int) =
-                for chainId = dispatchId * dispatchSize to min (this.NChains - 1) ((dispatchId + 1) * dispatchSize - 1) do
-                    this.RenderSingleChain(chainId, bootstrapSamplingTable, camera, film, aggregate, lightSampler)
-            Parallel.For(0, chainDispatchCount, chain) |> ignore
+            let partitioner = Partitioner.Create(0, this.NChains)
+            Parallel.ForEach(partitioner, (fun range _ ->
+                let first, last = range
+                for chainId = first to last - 1 do
+                    this.RenderSingleChain(chainId, bootstrapSamplingTable, camera, film, aggregate, lightSampler))
+            ) |> ignore
             printfn $"Accepted mutation count: %d{this.AcceptedMutationCount}"
             printfn $"Proposed mutation count: %d{this.ProposedMutationCount}"
             printfn $"Acceptance rate: %f{float this.AcceptedMutationCount / float this.ProposedMutationCount}"

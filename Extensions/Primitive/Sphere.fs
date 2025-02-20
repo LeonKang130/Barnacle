@@ -1,5 +1,6 @@
 ﻿namespace Barnacle.Extensions.Primitive
 
+open Barnacle.Util
 open Barnacle.Base
 open System
 open System.Numerics
@@ -8,6 +9,7 @@ open System.Numerics
 type SpherePrimitive(radius: float32) =
     inherit ElementalPrimitive()
     new() = SpherePrimitive(1f)
+    static member Default = SpherePrimitive(1f)
     member this.Radius = radius
 
     override this.Intersect(ray: Ray inref, t: float32) =
@@ -81,7 +83,6 @@ type SpherePrimitive(radius: float32) =
 [<Sealed>]
 type SphereInstance(sphere: SpherePrimitive, material: MaterialBase option, light: LightBase option) =
     inherit PrimitiveInstance(sphere, material, light)
-
     new(radius: float32, material: MaterialBase, light: LightBase) =
         SphereInstance(SpherePrimitive(radius), Some material, Some light)
 
@@ -90,6 +91,13 @@ type SphereInstance(sphere: SpherePrimitive, material: MaterialBase option, ligh
 
     new(radius: float32, light: LightBase) =
         SphereInstance(SpherePrimitive(radius), None, Some light)
+    
+    new(material: MaterialBase, light: LightBase) =
+        SphereInstance(SpherePrimitive.Default, Some material, Some light)
+    new(material: MaterialBase) =
+        SphereInstance(SpherePrimitive.Default, Some material, None)
+    new(light: LightBase) =
+        SphereInstance(SpherePrimitive.Default, None, Some light)
 
     member this.Sphere = sphere
 

@@ -1,24 +1,24 @@
-﻿#nowarn "9"
-namespace Barnacle.Extensions.Primitive
+﻿namespace Barnacle.Extensions.Primitive
 
 
+open Barnacle.Util
 open Barnacle.Base
 open System
 open System.Numerics
 open System.IO
 open System.Runtime.CompilerServices
-open System.Runtime.InteropServices
-open Microsoft.FSharp.NativeInterop
 
-[<IsReadOnly; Struct>]
-type internal Triangle(p0: Vector3, p1: Vector3, p2: Vector3) =
-    member this.P0 = p0
-    member this.P1 = p1
-    member this.P2 = p2
-    
+[<Struct; NoEquality; NoComparison>]
+type Triangle =
+    val mutable P0: Vector3
+    val mutable P1: Vector3
+    val mutable P2: Vector3
+    new(p0: Vector3, p1: Vector3, p2: Vector3) =
+        { P0 = p0; P1 = p1; P2 = p2 }
+
     member inline this.Bounds =
-        let pMin = Vector3.MinNative(Vector3.MinNative(p0, p1), p2)
-        let pMax = Vector3.MaxNative(Vector3.MaxNative(p0, p1), p2)
+        let pMin = Vector3.MinNative(Vector3.MinNative(this.P0, this.P1), this.P2)
+        let pMax = Vector3.MaxNative(Vector3.MaxNative(this.P0, this.P1), this.P2)
         AxisAlignedBoundingBox(pMin, pMax)
 
     member inline this.Intersect(ray: Ray inref, t: float32) =
@@ -96,7 +96,7 @@ type internal Triangle(p0: Vector3, p1: Vector3, p2: Vector3) =
         let p = uv.X * this.P1 + uv.Y * this.P2 + (1f - uv.X - uv.Y) * this.P0
         let n = Vector3.Cross(this.P1 - this.P0, this.P2 - this.P0)
         let pdf = 2f / n.Length()
-        LocalGeometry(p, Vector3.Normalize(n), uv), pdf
+        LocalGeometry(p, (0.5f * pdf) * n, uv), pdf
 
     static member inline Transform(triangle: Triangle inref, m: Matrix4x4) =
         let p0 = Vector3.Transform(triangle.P0, m)
@@ -116,19 +116,6 @@ type TriangleIndex(i0: int, i1: int, i2: int) =
     member this.I1 = i1
     member this.I2 = i2
 
-module private BLASTraversal =
-    let inline stackalloc<'a when 'a: unmanaged> (length: int) : 'a byref =
-        let p = NativePtr.stackalloc<'a> length
-        NativePtr.toByRef p
-    
-    let inline stackPush<'a when 'a: unmanaged> (stack: 'a byref, stackTop: int byref, value: 'a) =
-        Unsafe.Add(&stack, stackTop) <- value
-        stackTop <- stackTop + 1
-    
-    let inline stackPop<'a when 'a: unmanaged> (stack: 'a byref, stackTop: int byref) : 'a =
-        stackTop <- stackTop - 1
-        Unsafe.Add(&stack, stackTop)
-
 [<Sealed>]
 type MeshPrimitive(vertices: Vector3 array, indices: int array) =
     inherit ElementalPrimitive()
@@ -136,15 +123,41 @@ type MeshPrimitive(vertices: Vector3 array, indices: int array) =
     let triangleIndices =
         Array.init (indices.Length / 3) (fun i -> TriangleIndex(indices[i * 3], indices[i * 3 + 1], indices[i * 3 + 2]))
 
+    static member Quad =
+        let vertices = [|
+            Vector3(-1f, 0f, -1f)
+            Vector3(1f, 0f, -1f)
+            Vector3(1f, 0f, 1f)
+            Vector3(-1f, 0f, 1f)
+        |]
+        let indices = [| 0; 1; 2; 0; 2; 3 |]
+        MeshPrimitive(vertices, indices)
+    
+    static member Cube =
+        let vertices = [|
+            Vector3(-1f, -1f, -1f)
+            Vector3(1f, -1f, -1f)
+            Vector3(1f, 1f, -1f)
+            Vector3(-1f, 1f, -1f)
+            Vector3(-1f, -1f, 1f)
+            Vector3(1f, -1f, 1f)
+            Vector3(1f, 1f, 1f)
+            Vector3(-1f, 1f, 1f)
+        |]
+        let indices = [|
+            0; 1; 2; 0; 2; 3;
+            4; 5; 6; 4; 6; 7;
+            0; 1; 5; 0; 5; 4;
+            2; 3; 7; 2; 7; 6;
+            0; 3; 7; 0; 7; 4;
+            1; 2; 6; 1; 6; 5
+        |]
+        MeshPrimitive(vertices, indices)
+    
     member val TriangleIndices = triangleIndices with get
 
     member val BVHNodes =
-        let builder = BVHBuilder.Default
-
-        if builder.Config.MaxDepth > 128 then
-            failwith "BVH depth potentially exceeds 128"
-
-        builder.Build(
+        BVHNode.Build(
             triangleIndices.AsSpan(),
             (fun triangleIndex ->
                 let p0 = vertices[triangleIndex.I0]
@@ -158,13 +171,11 @@ type MeshPrimitive(vertices: Vector3 array, indices: int array) =
     member this.Vertices = vertices
     member this.TriangleCount = this.TriangleIndices.Length
 
-    member inline internal this.Item(i: int) =
-        let triangleIndices = &MemoryMarshal.GetArrayDataReference this.TriangleIndices
-        let triangleIndex = Unsafe.Add(&triangleIndices, i)
-        let vertices = &MemoryMarshal.GetArrayDataReference this.Vertices
-        let p0 = &Unsafe.Add(&vertices, triangleIndex.I0)
-        let p1 = &Unsafe.Add(&vertices, triangleIndex.I1)
-        let p2 = &Unsafe.Add(&vertices, triangleIndex.I2)
+    member inline this.Item(i: int) =
+        let triangleIndex = this.TriangleIndices[i]
+        let p0 = this.Vertices[triangleIndex.I0]
+        let p1 = this.Vertices[triangleIndex.I1]
+        let p2 = this.Vertices[triangleIndex.I2]
         Triangle(p0, p1, p2)
     
     member val AliasTable =
@@ -175,15 +186,14 @@ type MeshPrimitive(vertices: Vector3 array, indices: int array) =
         AliasTable(weights) with get
 
     override this.Intersect(ray: Ray inref, t: float32) =
-        let traversalStack = &BLASTraversal.stackalloc<int> 128
+        let traversalStack = Allocation.StackAlloc<int> (BVHBuildUtil.MaxDepth + 1)
         let mutable stackTop = 1
-        BLASTraversal.stackPush(&traversalStack, &stackTop, 0)
-        let nodes = &MemoryMarshal.GetArrayDataReference this.BVHNodes
+        Allocation.StackPush(traversalStack, &stackTop, 0)
         let mutable hit = false
 
         while not hit && stackTop <> 0 do
-            let i = BLASTraversal.stackPop(&traversalStack, &stackTop)
-            let node = Unsafe.Add(&nodes, i)
+            let i = Allocation.StackPop(traversalStack, &stackTop)
+            let node = this.BVHNodes[i]
 
             if node.Bounds.Intersect(&ray, t) then
                 if node.IsLeaf then
@@ -196,24 +206,23 @@ type MeshPrimitive(vertices: Vector3 array, indices: int array) =
                         instanceId <- instanceId + 1
                 else
                     if ray.Direction[node.SplitAxis] > 0f then
-                        BLASTraversal.stackPush(&traversalStack, &stackTop, node.RightChild)
-                        BLASTraversal.stackPush(&traversalStack, &stackTop, i + 1)
+                        Allocation.StackPush(traversalStack, &stackTop, node.RightChild)
+                        Allocation.StackPush(traversalStack, &stackTop, i + 1)
                     else
-                        BLASTraversal.stackPush(&traversalStack, &stackTop, i + 1)
-                        BLASTraversal.stackPush(&traversalStack, &stackTop, node.RightChild)
+                        Allocation.StackPush(traversalStack, &stackTop, i + 1)
+                        Allocation.StackPush(traversalStack, &stackTop, node.RightChild)
 
         hit
 
     override this.Intersect(ray: Ray inref, geom: LocalGeometry outref, t: float32 byref) =
-        let traversalStack = &BLASTraversal.stackalloc<int> 128
+        let traversalStack = Allocation.StackAlloc<int> 128
         let mutable stackTop = 0
-        BLASTraversal.stackPush(&traversalStack, &stackTop, 0)
-        let nodes = &MemoryMarshal.GetArrayDataReference this.BVHNodes
+        Allocation.StackPush(traversalStack, &stackTop, 0)
         let mutable hit = false
 
         while stackTop <> 0 do
-            let i = BLASTraversal.stackPop(&traversalStack, &stackTop)
-            let node = Unsafe.Add(&nodes, i)
+            let i = Allocation.StackPop(traversalStack, &stackTop)
+            let node = this.BVHNodes[i]
 
             if node.Bounds.Intersect(&ray, t) then
                 if node.IsLeaf then
@@ -224,11 +233,11 @@ type MeshPrimitive(vertices: Vector3 array, indices: int array) =
                             hit <- true
                 else
                     if ray.Direction[node.SplitAxis] > 0f then
-                        BLASTraversal.stackPush(&traversalStack, &stackTop, node.RightChild)
-                        BLASTraversal.stackPush(&traversalStack, &stackTop, i + 1)
+                        Allocation.StackPush(traversalStack, &stackTop, node.RightChild)
+                        Allocation.StackPush(traversalStack, &stackTop, i + 1)
                     else
-                        BLASTraversal.stackPush(&traversalStack, &stackTop, i + 1)
-                        BLASTraversal.stackPush(&traversalStack, &stackTop, node.RightChild)
+                        Allocation.StackPush(traversalStack, &stackTop, i + 1)
+                        Allocation.StackPush(traversalStack, &stackTop, node.RightChild)
 
         hit
 

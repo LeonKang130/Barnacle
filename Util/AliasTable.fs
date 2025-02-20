@@ -1,4 +1,4 @@
-﻿namespace Barnacle.Base
+﻿namespace Barnacle.Util
 
 open System.Collections.Generic
 open System.Runtime.CompilerServices
