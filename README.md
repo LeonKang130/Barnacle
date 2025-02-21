@@ -13,6 +13,7 @@ Although this renderer is not designed for actual real-time rendering, we would 
 - [x] Support triangle mesh
 - [x] Use BVH for acceleration
 - [ ] Support simple PBR material
-- [ ] Scene I/O & image/video output
+- [ ] Scene I/O
+- [x] Image output via [ImageSharp](https://github.com/SixLabors/ImageSharp)
 - [ ] ReSTIR DI
 - [x] Primary Sample Space Metropolis Light Transport
