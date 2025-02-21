@@ -1,0 +1,155 @@
+{
+  "nodes": [
+    {
+      "instance": [0, 1, 2, 3, 4, 5],
+      "children": [1, 2, 3]
+    },
+    {
+      "instance": 0,
+      "transform": 0
+    },
+    {
+      "instance": [6],
+      "transform": 1
+    },
+    {
+      "instance": [7],
+      "transform": 2
+    },
+    {
+      "instance": [8],
+      "transform": 3
+    }
+  ],
+  "transforms": [
+    {
+      "keyframes": [
+        {
+          "time": 0.0
+        }
+      ]
+    },
+    {
+      "keyframes": [
+        {
+          "time": 0.0,
+          "scale": [
+            10.0,
+            10.0,
+            10.0
+          ],
+          "translation": [
+            50.0,
+            80.0,
+            80.0
+          ]
+        }
+      ]
+    },
+    {
+      "keyframes": [
+        {
+          "time": 0.0,
+          "scale": [
+            16.5,
+            16.5,
+            16.5
+          ],
+          "translation": [
+            27.0,
+            16.5,
+            47.0
+          ]
+        }
+      ]
+    },
+    {
+      "keyframes": [
+        {
+          "time": 0.0,
+          "scale": [
+            12.0,
+            18.0,
+            12.0
+          ],
+          "rotation": [
+            0.0,
+            45.0,
+            0.0
+          ],
+          "translation": [
+            73.0,
+            9.0,
+            70.0
+          ]
+        }
+      ]
+    }
+  ],
+  "instances": [
+    {
+      "primitive": 0,
+      "material": 0
+    },
+    {
+      "primitive": 1,
+      "light": 0
+    }
+  ],
+  "primitives": [
+    {
+      "type": "mesh",
+      "vertices": [
+        1.0,
+        0.0,
+        0.0,
+        99.0,
+        0.0,
+        0.0,
+        99.0,
+        0.0,
+        181.0,
+        1.0,
+        0.0,
+        181.0
+      ],
+      "indices": [
+        0,
+        1,
+        2,
+        0,
+        2,
+        3
+      ]
+    },
+    {
+      "type": "mesh",
+      "uri": "stanford-bunny.obj"
+    },
+    {
+      "type": "sphere",
+      "radius": 1.0
+    }
+  ],
+  "materials": [
+    {
+      "type": "diffuse",
+      "albedo": [
+        0.25,
+        0.75,
+        0.25
+      ]
+    }
+  ],
+  "lights": [
+    {
+      "type": "diffuse",
+      "emission": [
+        50.0,
+        50.0,
+        50.0
+      ],
+      "two-sided": false
+    }
+  ]
+}
