@@ -5,7 +5,7 @@ open System.Runtime.CompilerServices
 open System.Numerics
 open System.Runtime.InteropServices
 open System.Threading.Tasks
-open System.IO
+open SixLabors.ImageSharp
 
 type ToneMapping =
     | Identity
@@ -33,9 +33,10 @@ type Film(resolution: struct (int * int), toneMapping: ToneMapping) =
     member val ImageWidth = imageWidth with get
     member val ImageHeight = imageHeight with get
     member val AspectRatio = float32 imageWidth / float32 imageHeight with get
-    
+
     member inline this.Clear() =
-        Parallel.For(0, this.Pixels.Length - 1, fun i -> this.Pixels[i] <- Vector3.Zero) |> ignore
+        Parallel.For(0, this.Pixels.Length - 1, (fun i -> this.Pixels[i] <- Vector3.Zero))
+        |> ignore
 
     member inline this.SetPixel(pixelId: struct (int * int), color: Vector3) =
         let struct (imageX, imageY) = pixelId
@@ -50,13 +51,16 @@ type Film(resolution: struct (int * int), toneMapping: ToneMapping) =
         let pixels = &MemoryMarshal.GetArrayDataReference this.Pixels
         let pixel = &Unsafe.Add(&pixels, index)
         pixel <- pixel + color
-    
-    member inline this.Save(filename: string) =
-        let inline toInt (x: float32) = int (255f * x + 0.5f)
-        use file = File.CreateText filename
-        file.Write $"P3\n{this.ImageWidth} {this.ImageHeight}\n255\n"
 
-        this.Pixels
-        |> Array.toSeq
-        |> Seq.map this.PostProcess
-        |> Seq.iter (fun x -> file.Write $"{toInt x.X} {toInt x.Y} {toInt x.Z} ")
+    member this.Save(filename: string) =
+        use image = new Image<PixelFormats.Rgba32>(this.ImageWidth, this.ImageHeight)
+
+        image.ProcessPixelRows(fun accessor ->
+            for y = 0 to accessor.Height - 1 do
+                let row = accessor.GetRowSpan(y)
+
+                for x = 0 to row.Length - 1 do
+                    let pixel = this.Pixels[y * this.ImageWidth + x]
+                    row[x] <- PixelFormats.Rgba32(this.PostProcess(pixel)))
+
+        image.Save(filename)

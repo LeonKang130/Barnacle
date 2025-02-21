@@ -8,9 +8,22 @@ open Barnacle.Extensions.Integrator
 open System
 open System.Numerics
 open System.Diagnostics
+open CommandLine
+
+type options = {
+    // TODO: input scene file should be specified here
+    [<Option('o', "output", Required = true, HelpText = "Output image file path")>]
+    output: string
+}
 
 [<EntryPoint>]
-let main _ =
+let main (args: string array) =
+    let mutable output = Unchecked.defaultof<string>
+    match Parser.Default.ParseArguments<options>(args) with
+    | :? Parsed<options> as parsed ->
+        output <- parsed.Value.output
+    | _ -> 
+        failwith "Invalid arguments."
     let imageWidth, imageHeight = 1024, 768
     let film = Film(struct (imageWidth, imageHeight), ToneMapping.Aces)
     // let camera = PinholeCamera(30f, float32 imageWidth / float32 imageHeight, 140f)
@@ -52,5 +65,5 @@ let main _ =
     integrator.Render(camera, film, aggregate, lightSampler)
     stopwatch.Stop()
     printfn $"Render time: %f{stopwatch.Elapsed.TotalSeconds} seconds"
-    film.Save "image.ppm"
+    film.Save output
     0

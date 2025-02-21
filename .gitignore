@@ -5,3 +5,4 @@ bin/
 obj/
 # Render output
 image.ppm
+Output/
