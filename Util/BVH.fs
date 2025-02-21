@@ -48,6 +48,8 @@ type AxisAlignedBoundingBox =
         AxisAlignedBoundingBox(Vector3.MinNative(a.pMin, b), Vector3.MaxNative(a.pMax, b))
 
     static member Default = AxisAlignedBoundingBox(Vector3.PositiveInfinity, Vector3.NegativeInfinity)
+    
+    override this.ToString() = $"AABB(pMin: {this.pMin}, pMax: {this.pMax})"
 
 [<Struct; NoComparison; NoEquality; StructLayout(LayoutKind.Explicit, Size = 32)>]
 type BVHNode =

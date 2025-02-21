@@ -60,7 +60,7 @@ let main (args: string array) =
     let instances = scene.Traverse(0f)
     let aggregate = BVHAggregate(instances)
     let lightSampler = UniformLightSampler(instances)
-    let integrator = PathTracingIntegrator(16)
+    let integrator = PathTracingIntegrator(64)
     let stopwatch = Stopwatch.StartNew()
     integrator.Render(camera, film, aggregate, lightSampler)
     stopwatch.Stop()

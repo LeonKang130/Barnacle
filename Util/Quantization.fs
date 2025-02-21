@@ -2,11 +2,13 @@
 
 open System
 open System.Numerics
+open System.Runtime.CompilerServices
 
 module Quantization =
     let private SQRT5 = MathF.Sqrt(5f)
     let private PHI = (1f + SQRT5) / 2f
     
+    [<IsReadOnly; Struct>]
     type private Matrix2x2 =
         {
             M11: float32

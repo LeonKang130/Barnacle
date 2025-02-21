@@ -58,3 +58,6 @@ type BVHAggregate(instances: PrimitiveInstance array) =
         hit
 
     override this.Bounds = this.BVHNodes[0].Bounds
+    
+    override this.ToString() =
+        $"BVHAggregate(Bounds: {this.Bounds}, Nodes: {this.BVHNodes.Length}, Instances: {this.BVHNodes.Length})"

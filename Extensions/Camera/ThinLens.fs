@@ -35,3 +35,6 @@ type ThinLensCamera(aperture: float32, focusDistance: float32, fovY: float32, as
             Ray(origin, direction), pdf
         else
             ray, pdf
+    
+    override this.ToString() =
+        $"ThinLensCamera(Aperture: {this.Aperture}, FocusDistance: {this.FocusDistance}, FovY: {this.FovY}, AspectRatio: {this.AspectRatio})"

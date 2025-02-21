@@ -51,3 +51,5 @@ type DiffuseLight(emission: Vector3, twoSided: bool) =
             this.Emission
         else
             Vector3.Zero
+    
+    override this.ToString() = $"DiffuseLight({this.Emission})"
