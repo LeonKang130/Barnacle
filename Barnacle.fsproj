@@ -12,6 +12,7 @@
     <Compile Include="Util\BVH.fs" />
     <Compile Include="Util\Hash.fs" />
     <Compile Include="Util\Transform.fs" />
+    <Compile Include="Util\Quantization.fs" />
     <Compile Include="Base\Ray.fs" />
     <Compile Include="Base\Sampler.fs" />
     <Compile Include="Base\Camera.fs" />

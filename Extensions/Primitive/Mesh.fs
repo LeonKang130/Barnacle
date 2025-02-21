@@ -185,8 +185,8 @@ type MeshPrimitive(vertices: Vector3 array, indices: int array) =
             triangle.SurfaceArea)
         AliasTable(weights) with get
 
-    override this.Intersect(ray: Ray inref, t: float32) =
-        let traversalStack = Allocation.StackAlloc<int> (BVHBuildUtil.MaxDepth + 1)
+    override this.Intersect(ray, t) =
+        let traversalStack = Allocation.StackAlloc<int> (BVHBuildConfig.MaxDepth + 1)
         let mutable stackTop = 1
         Allocation.StackPush(traversalStack, &stackTop, 0)
         let mutable hit = false
@@ -214,7 +214,7 @@ type MeshPrimitive(vertices: Vector3 array, indices: int array) =
 
         hit
 
-    override this.Intersect(ray: Ray inref, geom: LocalGeometry outref, t: float32 byref) =
+    override this.Intersect(ray, geom, t) =
         let traversalStack = Allocation.StackAlloc<int> 128
         let mutable stackTop = 0
         Allocation.StackPush(traversalStack, &stackTop, 0)
@@ -286,7 +286,7 @@ type MeshInstance(mesh: MeshPrimitive, material: MaterialBase option, light: Lig
     new(mesh: MeshPrimitive, material: MaterialBase) = MeshInstance(mesh, Some material, None)
     new(mesh: MeshPrimitive, light: LightBase) = MeshInstance(mesh, None, Some light)
 
-    override this.Sample(uSelect: float32, uSurface: Vector2) =
+    override this.Sample(uSelect, uSurface) =
         let i, pdfTriangle = this.Instance.AliasTable.Sample(uSelect)
         let mutable triangle = this.Instance[i]
         triangle <- Triangle.Transform(&triangle, this.ObjectToWorld)
@@ -297,7 +297,7 @@ type MeshInstance(mesh: MeshPrimitive, material: MaterialBase option, light: Lig
         interaction.inst <- this
         struct (interaction, pdfTriangle * pdfArea)
 
-    override this.EvalPDF(interaction: Interaction inref) =
+    override this.EvalPDF(interaction) =
         let i = interaction.geom.tag
         let mutable triangle = this.Instance[i]
         triangle <- Triangle.Transform(&triangle, this.ObjectToWorld)

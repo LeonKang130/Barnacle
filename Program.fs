@@ -12,7 +12,7 @@ open System.Diagnostics
 [<EntryPoint>]
 let main _ =
     let imageWidth, imageHeight = 1024, 768
-    let film = Film((imageWidth, imageHeight), ToneMapping.Aces)
+    let film = Film(struct (imageWidth, imageHeight), ToneMapping.Aces)
     // let camera = PinholeCamera(30f, float32 imageWidth / float32 imageHeight, 140f)
     let camera = ThinLensCamera(4f, 220f, 25f, float32 imageWidth / float32 imageHeight, 140f)
     camera.UpdateTransform(Matrix4x4.CreateTranslation(50f, 40.8f, 295.6f))
@@ -47,7 +47,7 @@ let main _ =
     let instances = scene.Traverse(0f)
     let aggregate = BVHAggregate(instances)
     let lightSampler = UniformLightSampler(instances)
-    let integrator = PathTracingIntegrator(1024)
+    let integrator = PathTracingIntegrator(16)
     let stopwatch = Stopwatch.StartNew()
     integrator.Render(camera, film, aggregate, lightSampler)
     stopwatch.Stop()

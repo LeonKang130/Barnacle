@@ -12,8 +12,9 @@ type ToneMapping =
     | Aces
     | Gamma
 
-type Film(resolution: int * int, toneMapping: ToneMapping) =
-    member val Pixels = Array.zeroCreate<Vector3> (fst resolution * snd resolution) with get
+type Film(resolution: struct (int * int), toneMapping: ToneMapping) =
+    let struct (imageWidth, imageHeight) = resolution
+    member val Pixels = Array.zeroCreate<Vector3> (imageWidth * imageHeight) with get
 
     member this.ToneMapping = toneMapping
 
@@ -28,10 +29,10 @@ type Film(resolution: int * int, toneMapping: ToneMapping) =
             Vector3(MathF.Pow(x.X, gamma), MathF.Pow(x.Y, gamma), MathF.Pow(x.Z, gamma))
         |> fun x -> Vector3.Clamp(x, Vector3.Zero, Vector3.One)
 
-    member val Resolution = struct (fst resolution, snd resolution) with get
-    member val ImageWidth = fst resolution with get
-    member val ImageHeight = snd resolution with get
-    member val AspectRatio = float32 (fst resolution) / float32 (snd resolution)
+    member this.Resolution = struct (imageWidth, imageHeight)
+    member val ImageWidth = imageWidth with get
+    member val ImageHeight = imageHeight with get
+    member val AspectRatio = float32 imageWidth / float32 imageHeight with get
     
     member inline this.Clear() =
         Parallel.For(0, this.Pixels.Length - 1, fun i -> this.Pixels[i] <- Vector3.Zero) |> ignore

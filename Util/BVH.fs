@@ -96,7 +96,7 @@ type BVHNode =
         node.SplitAxis <- splitAxis
         node
 
-module BVHBuildUtil =
+module BVHBuildConfig =
     [<Literal>]
     let SAHBinCount = 12
 
@@ -106,8 +106,10 @@ module BVHBuildUtil =
     [<Literal>]
     let MaxDepth = 64
 
+module private BVHBuildUtil =
+
     type AABB = AxisAlignedBoundingBox
-    
+
     [<Struct>]
     type Bin =
         val mutable Bounds: AABB
@@ -133,7 +135,7 @@ module BVHBuildUtil =
                 let struct (bounds, _) = subtreeInstances[i]
                 subtreeBounds <- AABB.Union(subtreeBounds, bounds)
 
-            if subtreeInstanceCount <= MaxLeafSize || depth >= MaxDepth then
+            if subtreeInstanceCount <= BVHBuildConfig.MaxLeafSize || depth >= BVHBuildConfig.MaxDepth then
                 Leaf(subtreeBounds, first, subtreeInstanceCount)
             else
                 let mutable centroidBounds = AABB.Default
@@ -153,18 +155,18 @@ module BVHBuildUtil =
 
                     Interior(subtreeBounds, splitAxis, leftSubtree, rightSubtree)
                 else
-                    let bins = Allocation.StackAllocAsSpan<Bin> SAHBinCount
+                    let bins = Allocation.StackAllocAsSpan<Bin> BVHBuildConfig.SAHBinCount
 
-                    for i = 0 to SAHBinCount - 1 do
+                    for i = 0 to BVHBuildConfig.SAHBinCount - 1 do
                         bins[i] <- Bin.Default
 
                     let inline findBinIndex (instance: struct (AABB * int)) =
                         let struct (bounds, _) = instance
-                        ((float32 SAHBinCount
+                        ((float32 BVHBuildConfig.SAHBinCount
                           * (bounds.Centroid[splitAxis] - centroidBounds.pMin[splitAxis]))
                          / splitExtent)
                         |> int
-                        |> min (SAHBinCount - 1)
+                        |> min (BVHBuildConfig.SAHBinCount - 1)
 
                     for i = first to last - 1 do
                         let instance = subtreeInstances[i - first]
@@ -174,7 +176,7 @@ module BVHBuildUtil =
                         bin.Bounds <- AABB.Union(bin.Bounds, bounds)
                         bin.Count <- bin.Count + 1
 
-                    let costs = Allocation.StackAllocAsSpan<float32> (SAHBinCount - 1)
+                    let costs = Allocation.StackAllocAsSpan<float32> (BVHBuildConfig.SAHBinCount - 1)
 
                     for i = 0 to costs.Length - 1 do
                         costs[i] <- 0f
@@ -235,7 +237,7 @@ module BVHBuildUtil =
             nodes.ToArray()
 
 type BVHNode with
-    static member inline Build(xs: 'a Span, [<InlineIfLambda>] f: 'a -> AxisAlignedBoundingBox) =
+    static member Build(xs: 'a Span, f: 'a -> AxisAlignedBoundingBox) =
         let xs' = xs.ToArray()
         let instances = xs' |> Array.mapi (fun i x -> struct ((f x), i))
         let nodes = BVHBuildUtil.Tree.Build(instances.AsSpan(), 0, instances.Length, 0).Flatten()
@@ -243,4 +245,3 @@ type BVHNode with
             let struct (_, index) = instances[i]
             xs[i] <- xs'[index]
         nodes
-        

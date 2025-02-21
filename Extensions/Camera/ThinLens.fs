@@ -24,7 +24,7 @@ type ThinLensCamera(aperture: float32, focusDistance: float32, fovY: float32, as
             let theta = MathF.PI / 2f - MathF.PI / 4f * (u.X / u.Y)
             r * Vector2(MathF.Cos(theta), MathF.Sin(theta))
            
-    override this.GenerateRay(resolution: struct (int * int), pixelId: struct (int * int), uPixel: Vector2, uLens: Vector2) =
+    override this.GenerateRay(resolution, pixelId, uPixel, uLens) =
         let struct (ray, pdf) = base.GenerateRay(resolution, pixelId, uPixel, Vector2.Zero)
         if this.Aperture > 0f then
             let pLens = this.Aperture * ThinLensCamera.SampleDiskConcentric(uLens)

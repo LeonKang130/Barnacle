@@ -12,7 +12,7 @@ type SpherePrimitive(radius: float32) =
     static member Default = SpherePrimitive(1f)
     member this.Radius = radius
 
-    override this.Intersect(ray: Ray inref, t: float32) =
+    override this.Intersect(ray, t) =
         let eps = 1e-3f
         let f = ray.Origin
         let a = ray.Direction.LengthSquared()
@@ -34,7 +34,7 @@ type SpherePrimitive(radius: float32) =
 
                 t1 > eps && t1 < t
 
-    override this.Intersect(ray: Ray inref, geom: LocalGeometry outref, t: float32 byref) =
+    override this.Intersect(ray, geom, t) =
         let eps = 1e-3f
         let f = ray.Origin
         let a = ray.Direction.LengthSquared()
@@ -101,7 +101,7 @@ type SphereInstance(sphere: SpherePrimitive, material: MaterialBase option, ligh
 
     member this.Sphere = sphere
 
-    override this.Sample(_, uSurface: Vector2) =
+    override this.Sample(_, uSurface) =
         let struct (sinTheta, cosTheta) = MathF.SinCos(2f * MathF.PI * uSurface.X)
         let cosPhi = Single.FusedMultiplyAdd(-2f, uSurface.Y, 1f)
         let sinPhi = MathF.Sqrt(Single.FusedMultiplyAdd(-cosPhi, cosPhi, 1f))
@@ -127,7 +127,7 @@ type SphereInstance(sphere: SpherePrimitive, material: MaterialBase option, ligh
         interaction.geom <- LocalGeometry(p', invJacobian * n', uSurface)
         struct (interaction, invJacobian / (4f * MathF.PI * this.Sphere.Radius * this.Sphere.Radius))
 
-    override this.EvalPDF(interaction: Interaction inref) =
+    override this.EvalPDF(interaction) =
         let t' =
             Vector3.Transform(interaction.Tangent, this.WorldToObject)
             - this.WorldToObject.Translation

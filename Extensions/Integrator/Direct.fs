@@ -7,8 +7,7 @@ open System.Numerics
 type DirectIntegrator(spp: int) =
     inherit ProgressiveIntegrator(spp)
 
-    override this.Li(ray: Ray inref, aggregate: PrimitiveAggregate, lightSampler: LightSamplerBase, sampler: Sampler byref)
-        =
+    override this.Li(ray, aggregate, lightSampler, sampler) =
         let mutable t = infinityf
         let mutable interaction = Unchecked.defaultof<Interaction>
         let mutable L = Vector3.Zero
@@ -18,7 +17,9 @@ type DirectIntegrator(spp: int) =
                 L <- L + interaction.EvalEmit(-ray.Direction)
 
             if interaction.HasMaterial then
-                let lightSample = lightSampler.Sample(interaction.Position, sampler.Next1D(), sampler.Next2D())
+                let lightSample =
+                    lightSampler.Sample(interaction.Position, sampler.Next1D(), sampler.Next2D())
+
                 let shadowRay = interaction.SpawnRay(lightSample.wi)
                 let lightDistance = (lightSample.eval.p - interaction.Position).Length()
                 let occluded = aggregate.Intersect(&shadowRay, lightDistance - 1e-3f)

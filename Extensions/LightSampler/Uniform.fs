@@ -10,7 +10,7 @@ open System.Runtime.CompilerServices
 type UniformLightSampler(primitiveInstances: PrimitiveInstance array) =
     inherit LightSamplerBase(primitiveInstances)
 
-    override this.Sample(p: Vector3, uSelect: float32, uLight: Vector2) =
+    override this.Sample(p, uSelect, uLight) =
         let mutable uSelect = uSelect * float32 this.Instances.Length
         let primitiveId = min (int uSelect) (this.Instances.Length - 1)
         uSelect <- uSelect - float32 primitiveId
@@ -28,7 +28,7 @@ type UniformLightSampler(primitiveInstances: PrimitiveInstance array) =
             wi = -wo
         }
     
-    override this.SampleEmit(uSelect: float32, uLight: Vector2, uEmit: Vector2) =
+    override this.SampleEmit(uSelect, uLight, uEmit) =
         let mutable uSelect = uSelect * float32 this.Instances.Length
         let primitiveId = min (int uSelect) (this.Instances.Length - 1)
         uSelect <- uSelect - float32 primitiveId
@@ -37,7 +37,7 @@ type UniformLightSampler(primitiveInstances: PrimitiveInstance array) =
         let sample = interaction.SampleEmit(uEmit)
         { sample with eval.pdf = pdfSurface * sample.eval.pdf / float32 this.Instances.Length }
     
-    override this.Eval(p: Vector3, interaction: Interaction inref) =
+    override this.Eval(p, interaction) =
         let wo = Vector3.Normalize(p - interaction.Position)
         let cosWo = Vector3.Dot(interaction.Normal, wo)
         let pdfSurface = interaction.inst.EvalPDF(&interaction)

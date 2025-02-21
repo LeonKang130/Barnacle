@@ -16,4 +16,3 @@ Although this renderer is not designed for actual real-time rendering, we would 
 - [ ] Scene I/O & image/video output
 - [ ] ReSTIR DI
 - [x] Primary Sample Space Metropolis Light Transport
-- [ ] Stochastic Progressive Photon Mapping
