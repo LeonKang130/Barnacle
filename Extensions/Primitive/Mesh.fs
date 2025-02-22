@@ -123,7 +123,7 @@ type MeshPrimitive(vertices: Vector3 array, indices: int array) =
     let triangleIndices =
         Array.init (indices.Length / 3) (fun i -> TriangleIndex(indices[i * 3], indices[i * 3 + 1], indices[i * 3 + 2]))
 
-    static member Quad =
+    static member val Quad =
         let vertices = [|
             Vector3(-1f, 0f, -1f)
             Vector3(1f, 0f, -1f)
@@ -131,9 +131,9 @@ type MeshPrimitive(vertices: Vector3 array, indices: int array) =
             Vector3(-1f, 0f, 1f)
         |]
         let indices = [| 0; 1; 2; 0; 2; 3 |]
-        MeshPrimitive(vertices, indices)
+        MeshPrimitive(vertices, indices) with get
     
-    static member Cube =
+    static member val Cube =
         let vertices = [|
             Vector3(-1f, -1f, -1f)
             Vector3(1f, -1f, -1f)
@@ -152,7 +152,7 @@ type MeshPrimitive(vertices: Vector3 array, indices: int array) =
             0; 4; 7; 0; 7; 3;
             1; 2; 6; 1; 6; 5
         |]
-        MeshPrimitive(vertices, indices)
+        MeshPrimitive(vertices, indices) with get
     
     member val TriangleIndices = triangleIndices with get
 

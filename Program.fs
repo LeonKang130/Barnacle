@@ -36,7 +36,7 @@ let main (args: string array) =
     let blueMaterial = Lambertian(Vector3(0.25f, 0.25f, 0.75f)) :> MaterialBase
     let mirrorMaterial = MirrorMaterial() :> MaterialBase
     let glassMaterial = DielectricMaterial(1.5f) :> MaterialBase
-    let whiteLight = DiffuseLight(Vector3(80f), false) :> LightBase
+    let whiteLight = DiffuseLight(Vector3(60f), false) :> LightBase
     // Primitives
     let floor = MeshPrimitive([| Vector3(1f, 0f, 0f); Vector3(99f, 0f, 0f); Vector3(99f, 0f, 181f); Vector3(1f, 0f, 181f) |], [| 0; 1; 2; 0; 2; 3 |])
     let ceiling = MeshPrimitive([| Vector3(1f, 81.6f, 0f); Vector3(99f, 81.6f, 0f); Vector3(99f, 81.6f, 181f); Vector3(1f, 81.6f, 181f) |], [| 0; 2; 1; 0; 3; 2 |])
@@ -46,8 +46,8 @@ let main (args: string array) =
     let backWall = MeshPrimitive([| Vector3(1f, 0f, 0f); Vector3(99f, 0f, 0f); Vector3(99f, 81.6f, 0f); Vector3(1f, 81.6f, 0f) |], [| 0; 2; 1; 0; 3; 2 |])
     // Scene
     let node = Node(Transform(), [|
-        Node(Transform(Matrix4x4.CreateScale(10f) * Matrix4x4.CreateTranslation(50f, 80f, 80f)), [| MeshInstance(MeshPrimitive.Quad, whiteLight) :> PrimitiveInstance |])
-        Node(Transform(Matrix4x4.CreateScale(16.5f) * Matrix4x4.CreateTranslation(27f, 16.5f, 47f)), [| SphereInstance(1f, glassMaterial) :> PrimitiveInstance |])
+        Node(Transform(Matrix4x4.CreateScale(10f) * Matrix4x4.CreateTranslation(50f, 81.5f, 80f)), [| MeshInstance(MeshPrimitive.Quad, whiteLight) :> PrimitiveInstance |])
+        Node(Transform(Matrix4x4.CreateTranslation(27f, 46.5f, 47f)), [| SphereInstance(16.5f, glassMaterial) :> PrimitiveInstance |])
         Node(Transform(Matrix4x4.CreateScale(12f, 18f, 12f) * Matrix4x4.CreateRotationY(Single.DegreesToRadians(45f)) * Matrix4x4.CreateTranslation(73f, 9f, 70f)),
              [| MeshInstance(MeshPrimitive.Cube, mirrorMaterial) :> PrimitiveInstance |])
     |], [|
@@ -62,7 +62,7 @@ let main (args: string array) =
     let instances = scene.Traverse(0f)
     let aggregate = BVHAggregate(instances)
     let lightSampler = UniformLightSampler(instances)
-    let integrator = PSSMLTIntegrator(256)
+    let integrator = PSSMLTIntegrator(16)
     let stopwatch = Stopwatch.StartNew()
     integrator.Render(camera, film, aggregate, lightSampler)
     stopwatch.Stop()

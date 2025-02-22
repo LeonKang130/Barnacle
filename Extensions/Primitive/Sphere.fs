@@ -9,7 +9,6 @@ open System.Numerics
 type SpherePrimitive(radius: float32) =
     inherit ElementalPrimitive()
     new() = SpherePrimitive(1f)
-    static member Default = SpherePrimitive(1f)
     member this.Radius = radius
 
     override this.Intersect(ray, t) =
@@ -77,27 +76,26 @@ type SpherePrimitive(radius: float32) =
                     true
                 else
                     false
-    
-    override this.Bounds = AxisAlignedBoundingBox(Vector3(-this.Radius), Vector3(this.Radius))
+
+    override this.Bounds =
+        AxisAlignedBoundingBox(Vector3(-this.Radius), Vector3(this.Radius))
+
+    static member val Unit = SpherePrimitive(1f) with get
 
 [<Sealed>]
 type SphereInstance(sphere: SpherePrimitive, material: MaterialBase option, light: LightBase option) =
     inherit PrimitiveInstance(sphere, material, light)
+
     new(radius: float32, material: MaterialBase, light: LightBase) =
         SphereInstance(SpherePrimitive(radius), Some material, Some light)
 
-    new(radius: float32, material: MaterialBase) =
-        SphereInstance(SpherePrimitive(radius), Some material, None)
+    new(radius: float32, material: MaterialBase) = SphereInstance(SpherePrimitive(radius), Some material, None)
 
-    new(radius: float32, light: LightBase) =
-        SphereInstance(SpherePrimitive(radius), None, Some light)
-    
-    new(material: MaterialBase, light: LightBase) =
-        SphereInstance(SpherePrimitive.Default, Some material, Some light)
-    new(material: MaterialBase) =
-        SphereInstance(SpherePrimitive.Default, Some material, None)
-    new(light: LightBase) =
-        SphereInstance(SpherePrimitive.Default, None, Some light)
+    new(radius: float32, light: LightBase) = SphereInstance(SpherePrimitive(radius), None, Some light)
+
+    new(material: MaterialBase, light: LightBase) = SphereInstance(SpherePrimitive.Unit, Some material, Some light)
+    new(material: MaterialBase) = SphereInstance(SpherePrimitive.Unit, Some material, None)
+    new(light: LightBase) = SphereInstance(SpherePrimitive.Unit, None, Some light)
 
     member this.Sphere = sphere
 
@@ -106,8 +104,7 @@ type SphereInstance(sphere: SpherePrimitive, material: MaterialBase option, ligh
         let cosPhi = Single.FusedMultiplyAdd(-2f, uSurface.Y, 1f)
         let sinPhi = MathF.Sqrt(Single.FusedMultiplyAdd(-cosPhi, cosPhi, 1f))
 
-        let n =
-            Vector3(cosTheta * sinPhi, sinTheta * sinPhi, cosPhi)
+        let n = Vector3(cosTheta * sinPhi, sinTheta * sinPhi, cosPhi)
 
         let mutable interaction = Unchecked.defaultof<Interaction>
         interaction.geom <- LocalGeometry(n * this.Sphere.Radius, n, uSurface)
