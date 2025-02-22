@@ -25,5 +25,7 @@ type Lambertian(albedo: Vector3) =
 
         { eval = { bsdf = albedo * pdf; pdf = pdf }
           wi = if wo.Z > 0f then wi else -wi }
+    
+    override this.IsDiffuse() = true
 
     override this.ToString() = $"Lambertian(Albedo: {this.Albedo})"
