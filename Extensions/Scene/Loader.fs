@@ -15,7 +15,7 @@ type KeyFrameInfo =
         rotation: float32 array
         translation: float32 array
     }
-    member this.ToKeyFrame() =
+    member inline this.ToKeyFrame() =
         let scale =
             if this.scale <> null then
                 Matrix4x4.CreateScale(this.scale[0], this.scale[1], this.scale[2])
@@ -37,7 +37,7 @@ type TransformInfo =
     {
         keyframes: KeyFrameInfo array
     }
-    member this.ToTransform() =
+    member inline this.ToTransform() =
         let keyframes =
             this.keyframes
             |> Array.map _.ToKeyFrame()
@@ -50,7 +50,7 @@ type MaterialInfo =
         albedo: float32 array
         ior: float32 Nullable
     }
-    member this.ToMaterial(): MaterialBase =
+    member inline this.ToMaterial(): MaterialBase =
         match this.``type`` with
         | "lambertian" ->
             let albedo =
@@ -71,7 +71,7 @@ type LightInfo =
         emission: float32 array
         ``two-sided``: bool Nullable
     }
-    member this.ToLight(): LightBase =
+    member inline this.ToLight(): LightBase =
         match this.``type`` with
         | "diffuse" ->
             let emission =
@@ -90,7 +90,7 @@ type PrimitiveInfo =
         vertices: float32 array
         indices: int array
     }
-    member this.ToPrimitive(): ElementalPrimitive =
+    member inline this.ToPrimitive(): ElementalPrimitive =
         match this.``type`` with
         | "sphere" ->
             SpherePrimitive(this.radius.GetValueOrDefault(1f))
@@ -115,7 +115,7 @@ type PrimitiveInstanceInfo =
         material: int Nullable
         light: int Nullable
     }
-    member this.ToPrimitiveInstance(primitives: ElementalPrimitive array, materials: MaterialBase array, lights: LightBase array): PrimitiveInstance =
+    member inline this.ToPrimitiveInstance(primitives: ElementalPrimitive array, materials: MaterialBase array, lights: LightBase array): PrimitiveInstance =
         let primitive = primitives[this.primitive]
         let material =
             if this.material.HasValue then
@@ -140,6 +140,17 @@ type NodeInfo =
         transform: int Nullable
         children: int array
     }
+    member inline this.ToNode(transforms: Transform array, instances: PrimitiveInstance array) =
+        let transform =
+            if this.transform.HasValue then
+                transforms[this.transform.Value]
+            else
+                Transform()
+        let instances' =
+            this.instances
+            |> Array.map (fun idx -> instances[idx])
+        Node(transform, instances')
+        
 
 type SceneInfo =
     {
@@ -151,7 +162,7 @@ type SceneInfo =
         materials: MaterialInfo array
         lights: LightInfo array
     }
-    member this.ToScene() =
+    member inline this.ToScene() =
         let transforms =
             this.transforms
             |> Array.map _.ToTransform()
@@ -169,19 +180,7 @@ type SceneInfo =
             |> Array.map _.ToPrimitiveInstance(primitives, materials, lights)
         let nodes =
             this.nodes
-            |> Array.map (fun nodeInfo ->
-                let transform =
-                    if nodeInfo.transform.HasValue then
-                        transforms[nodeInfo.transform.Value]
-                    else
-                        Transform()
-                let instances =
-                    if nodeInfo.instances <> null then
-                        nodeInfo.instances
-                        |> Array.map (fun i -> instances[i])
-                    else
-                        [||]
-                Node(transform, instances))
+            |> Array.map _.ToNode(transforms, instances)
         for i = 0 to nodes.Length - 1 do
             if this.nodes[i].children <> null then
                 for j in this.nodes[i].children do
