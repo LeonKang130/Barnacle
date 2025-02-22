@@ -35,11 +35,9 @@ type Transform(keyFrames: KeyFrame array) =
                 KeyFrame.Interpolate(&prevFrame, &nextFrame, t)
             | None -> this.KeyFrames[0].Matrix)
     
-type Node(transform: Transform, children: Node array, instances: PrimitiveInstance array) =
-    new(transform: Transform, instances: PrimitiveInstance array) = Node(transform, [||], instances)
-    new(transform: Transform, children: Node array) = Node(transform, children, [||])
+type Node(transform: Transform, instances: PrimitiveInstance array) =
     member this.Transform = transform
-    member this.Children = children
+    member val Children = ResizeArray<Node>() with get
     member this.Instances = instances
     member this.Traverse(t: float32, nodeToWorld: Matrix4x4) =
         seq {

@@ -4,6 +4,8 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>net9.0</TargetFramework>
     <PublishAot>true</PublishAot>
+    <PublishTrimmed>true</PublishTrimmed>
+    <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
   </PropertyGroup>
 
   <ItemGroup>
@@ -36,6 +38,7 @@
     <Compile Include="Extensions\Material\Mirror.fs" />
     <Compile Include="Extensions\LightSampler\Uniform.fs" />
     <Compile Include="Extensions\Aggregate\BVH.fs" />
+    <Compile Include="Extensions\Scene\Loader.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

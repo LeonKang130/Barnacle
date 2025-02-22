@@ -1,0 +1,341 @@
+﻿{
+    "root": 0,
+    "nodes": [
+        {
+            "instances": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5
+            ],
+            "children": [
+                1,
+                2,
+                3
+            ]
+        },
+        {
+            "instances": [
+                6
+            ],
+            "transform": 0
+        },
+        {
+            "instances": [
+                7
+            ],
+            "transform": 1
+        },
+        {
+            "instances": [
+                8
+            ],
+            "transform": 2
+        }
+    ],
+    "instances": [
+        {
+            "primitive": 0,
+            "material": 0
+        },
+        {
+            "primitive": 1,
+            "material": 0
+        },
+        {
+            "primitive": 2,
+            "material": 2
+        },
+        {
+            "primitive": 3,
+            "material": 3
+        },
+        {
+            "primitive": 4,
+            "material": 1
+        },
+        {
+            "primitive": 5,
+            "material": 0
+        },
+        {
+            "primitive": 6,
+            "light": 0
+        },
+        {
+            "primitive": 7,
+            "material": 4
+        },
+        {
+            "primitive": 8,
+            "material": 5
+        }
+    ],
+    "primitives": [
+        {
+            "type": "mesh",
+            "vertices": [
+                1.0,
+                0.0,
+                0.0,
+                99.0,
+                0.0,
+                0.0,
+                99.0,
+                0.0,
+                181.0,
+                1.0,
+                0.0,
+                181.0
+            ],
+            "indices": [
+                0,
+                1,
+                2,
+                0,
+                2,
+                3
+            ]
+        },
+        {
+            "type": "mesh",
+            "vertices": [
+                1.0,
+                81.6,
+                0.0,
+                99.0,
+                81.6,
+                0.0,
+                99.0,
+                81.6,
+                181.0,
+                1.0,
+                81.6,
+                181.0
+            ],
+            "indices": [
+                0,
+                2,
+                1,
+                0,
+                3,
+                2
+            ]
+        },
+        {
+            "type": "mesh",
+            "vertices": [
+                1.0,
+                0.0,
+                0.0,
+                1.0,
+                81.6,
+                0.0,
+                1.0,
+                81.6,
+                181.0,
+                1.0,
+                0.0,
+                181.0
+            ],
+            "indices": [
+                0,
+                1,
+                2,
+                0,
+                2,
+                3
+            ]
+        },
+        {
+            "type": "mesh",
+            "vertices": [
+                99.0,
+                0.0,
+                0.0,
+                99.0,
+                81.6,
+                0.0,
+                99.0,
+                81.6,
+                181.0,
+                99.0,
+                0.0,
+                181.0
+            ],
+            "indices": [
+                0,
+                2,
+                1,
+                0,
+                3,
+                2
+            ]
+        },
+        {
+            "type": "mesh",
+            "vertices": [
+                1.0,
+                0.0,
+                181.0,
+                99.0,
+                0.0,
+                181.0,
+                99.0,
+                81.6,
+                181.0,
+                1.0,
+                81.6,
+                181.0
+            ],
+            "indices": [
+                0,
+                2,
+                1,
+                0,
+                3,
+                2
+            ]
+        },
+        {
+            "type": "mesh",
+            "vertices": [
+                1.0,
+                0.0,
+                0.0,
+                99.0,
+                0.0,
+                0.0,
+                99.0,
+                81.6,
+                0.0,
+                1.0,
+                81.6,
+                0.0
+            ],
+            "indices": [
+                0,
+                1,
+                2,
+                0,
+                2,
+                3
+            ]
+        },
+        {
+            "type": "quad"
+        },
+        {
+            "type": "sphere",
+            "radius": 16.5
+        },
+        {
+            "type": "cube"
+        }
+    ],
+    "materials": [
+        {
+            "type": "lambertian",
+            "albedo": [
+                0.75,
+                0.75,
+                0.75
+            ]
+        },
+        {
+            "type": "lambertian",
+            "albedo": [
+                0.0,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "type": "lambertian",
+            "albedo": [
+                0.75,
+                0.25,
+                0.25
+            ]
+        },
+        {
+            "type": "lambertian",
+            "albedo": [
+                0.25,
+                0.25,
+                0.75
+            ]
+        },
+        {
+            "type": "mirror"
+        },
+        {
+            "type": "dielectric"
+        }
+    ],
+    "lights": [
+        {
+            "type": "diffuse",
+            "emission": [
+                60.0,
+                60.0,
+                60.0
+            ]
+        }
+    ],
+    "transforms": [
+        {
+            "keyframes": [
+                {
+                    "time": 0.0,
+                    "scale": [
+                        10.0,
+                        10.0,
+                        10.0
+                    ],
+                    "translation": [
+                        50.0,
+                        81.5,
+                        80.0
+                    ]
+                }
+            ]
+        },
+        {
+            "keyframes": [
+                {
+                    "time": 0.0,
+                    "translation": [
+                        27.0,
+                        16.5,
+                        47.0
+                    ]
+                }
+            ]
+        },
+        {
+            "keyframes": [
+                {
+                    "time": 0.0,
+                    "scale": [
+                        12.0,
+                        18.0,
+                        12.0
+                    ],
+                    "rotation": [
+                        0.0,
+                        45.0,
+                        0.0
+                    ],
+                    "translation": [
+                        73.0,
+                        9.0,
+                        70.0
+                    ]
+                }
+            ]
+        }
+    ]
+}

@@ -281,14 +281,14 @@ type MeshPrimitive(vertices: Vector3 array, indices: int array) =
 [<Sealed>]
 type MeshInstance(mesh: MeshPrimitive, material: MaterialBase option, light: LightBase option) =
     inherit PrimitiveInstance(mesh, material, light)
-    member this.Instance = mesh
+    member this.Mesh = mesh
     new(mesh: MeshPrimitive, material: MaterialBase, light: LightBase) = MeshInstance(mesh, Some material, Some light)
     new(mesh: MeshPrimitive, material: MaterialBase) = MeshInstance(mesh, Some material, None)
     new(mesh: MeshPrimitive, light: LightBase) = MeshInstance(mesh, None, Some light)
 
     override this.Sample(uSelect, uSurface) =
-        let i, pdfTriangle = this.Instance.AliasTable.Sample(uSelect)
-        let mutable triangle = this.Instance[i]
+        let i, pdfTriangle = this.Mesh.AliasTable.Sample(uSelect)
+        let mutable triangle = this.Mesh[i]
         triangle <- Triangle.Transform(&triangle, this.ObjectToWorld)
         let mutable interaction = Unchecked.defaultof<Interaction>
         let mutable geom, pdfArea = triangle.Sample(uSurface)
@@ -299,6 +299,6 @@ type MeshInstance(mesh: MeshPrimitive, material: MaterialBase option, light: Lig
 
     override this.EvalPDF(interaction) =
         let i = interaction.geom.tag
-        let mutable triangle = this.Instance[i]
+        let mutable triangle = this.Mesh[i]
         triangle <- Triangle.Transform(&triangle, this.ObjectToWorld)
-        this.Instance.AliasTable.Table[i].pdf / triangle.SurfaceArea
+        this.Mesh.AliasTable.Table[i].pdf / triangle.SurfaceArea
