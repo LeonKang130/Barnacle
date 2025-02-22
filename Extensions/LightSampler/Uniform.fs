@@ -47,6 +47,3 @@ type UniformLightSampler(primitiveInstances: PrimitiveInstance array) =
             L = interaction.EvalEmit(wo)
             pdf = dist2 * pdfSurface / (MathF.Max(MathF.Abs(cosWo), 1e-6f) * float32 this.Instances.Length)
         }
-    
-    override this.ToString() = 
-        $"UniformLightSampler(Instances: {this.Instances.Length})"

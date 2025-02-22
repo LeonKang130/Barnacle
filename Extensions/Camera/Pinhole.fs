@@ -26,5 +26,3 @@ type PinholeCamera(fovY: float32, aspectRatio: float32, pushForward: float32) =
             + (float32 imageX + uPixel.X) * pixelDeltaU
             + (float32 imageY + uPixel.Y) * pixelDeltaV
         Ray(Vector3.Zero, Vector3.Normalize(pixelLocation)), 1f
-
-    override this.ToString() = $"PinholeCamera(FovY: {this.FovY}, AspectRatio: {this.AspectRatio})"

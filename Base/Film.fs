@@ -64,5 +64,3 @@ type Film(resolution: struct (int * int), toneMapping: ToneMapping) =
                     row[x] <- PixelFormats.Rgba32(this.PostProcess(pixel)))
 
         image.Save(filename)
-    
-    override this.ToString() = $"Film: {this.ImageWidth}x{this.ImageHeight} ({this.ToneMapping})"

@@ -27,4 +27,4 @@ type DielectricMaterial(ior: float32) =
                 { eval = { bsdf = Vector3(r); pdf = r }; wi = Vector3(-wo.X, -wo.Y, wo.Z) }
             else
                 { eval = { bsdf = Vector3(1f - r); pdf = 1f - r }; wi = Vector3(-wo.X * ior', -wo.Y * ior', -MathF.CopySign(cosTheta, wo.Z)) }
-    override this.IsDiffuse() = false
+    override this.IsDiffuse = false

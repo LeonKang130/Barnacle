@@ -23,9 +23,6 @@ type Ray =
 
     static member inline Transform(ray: Ray, m: Matrix4x4) = Ray.Transform(&ray, m)
 
-    override this.ToString() =
-        $"Ray(Origin: {this.Origin}, Direction: {this.Direction})"
-
 [<AutoOpen>]
 module BVHExtensions =
     type AxisAlignedBoundingBox with
