@@ -8,11 +8,11 @@ open System.Numerics
 open System.IO
 open System.Runtime.CompilerServices
 
-[<Struct; NoEquality; NoComparison>]
+[<Struct; IsReadOnly; NoEquality; NoComparison>]
 type Triangle =
-    val mutable P0: Vector3
-    val mutable P1: Vector3
-    val mutable P2: Vector3
+    val P0: Vector3
+    val P1: Vector3
+    val P2: Vector3
     new(p0: Vector3, p1: Vector3, p2: Vector3) =
         { P0 = p0; P1 = p1; P2 = p2 }
 

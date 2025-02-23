@@ -60,7 +60,7 @@ type PathTracingIntegrator(spp: int, maxDepth: int, rrDepth: int) =
                                 L
                             )
 
-                    bsdfSample <- interaction.SampleBSDF(-ray.Direction, sampler.Next2D())
+                    bsdfSample <- interaction.SampleBSDF(-ray.Direction, sampler.Next1D(), sampler.Next2D())
 
                     if bsdfSample.eval.pdf = 0f then
                         depth <- this.MaxDepth

@@ -16,5 +16,5 @@ type BSDFSample = {
 [<AbstractClass>]
 type MaterialBase() =
     abstract member Eval: Vector3 * Vector3 * Vector2 -> BSDFEval
-    abstract member Sample: Vector3 * Vector2 * Vector2 -> BSDFSample
+    abstract member Sample: Vector3 * Vector2 * float32 * Vector2 -> BSDFSample
     abstract member IsDiffuse: bool

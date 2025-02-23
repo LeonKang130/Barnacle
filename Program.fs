@@ -39,7 +39,7 @@ let main (args: string array) =
     let film = Film(struct (imageWidth, imageHeight), ToneMapping.Aces)
     let camera = ThinLensCamera(4f, 220f, 25f, float32 imageWidth / float32 imageHeight, 140f)
     camera.UpdateTransform(Matrix4x4.CreateTranslation(50f, 40.8f, 295.6f))
-    let integrator = PathTracingIntegrator(1024)
+    let integrator = PSSMLTIntegrator(1024)
     let stopwatch = Stopwatch.StartNew()
     RenderImage(scene, camera, film, integrator, 0f)
     stopwatch.Stop()

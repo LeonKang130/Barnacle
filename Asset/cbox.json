@@ -269,10 +269,18 @@
             ]
         },
         {
-            "type": "mirror"
+            "type": "pbr",
+            "albedo": [
+                0.75,
+                0.75,
+                0.75
+            ],
+            "roughness": 0.6,
+            "metallic": 1.0
         },
         {
-            "type": "dielectric"
+            "type": "dielectric",
+            "ior": 1.5
         }
     ],
     "lights": [
@@ -326,7 +334,7 @@
                     ],
                     "rotation": [
                         0.0,
-                        45.0,
+                        60.0,
                         0.0
                     ],
                     "translation": [

@@ -49,20 +49,23 @@ type MaterialInfo =
         ``type``: string
         albedo: float32 array
         ior: float32 Nullable
+        roughness: float32 Nullable
+        metallic: float32 Nullable
     }
     member inline this.ToMaterial(): MaterialBase =
+        let baseColor =
+            if this.albedo <> null then
+                Vector3(this.albedo[0], this.albedo[1], this.albedo[2])
+            else
+                Vector3.One
+        let ior = this.ior.GetValueOrDefault(1.5f)
+        let roughness = this.roughness.GetValueOrDefault(1f)
+        let metallic = this.metallic.GetValueOrDefault(0f)
         match this.``type`` with
-        | "lambertian" ->
-            let albedo =
-                if this.albedo <> null then
-                    Vector3(this.albedo[0], this.albedo[1], this.albedo[2])
-                else
-                    Vector3.One
-            Lambertian(albedo)
-        | "mirror" ->
-            MirrorMaterial()
-        | "dielectric" ->
-            DielectricMaterial(this.ior.GetValueOrDefault(1.5f))
+        | "lambertian" -> Lambertian(baseColor)
+        | "mirror" -> MirrorMaterial(baseColor)
+        | "dielectric" -> DielectricMaterial(baseColor, ior)
+        | "pbr" -> PBRMaterial(baseColor, metallic, roughness)
         | _ -> failwith $"Unknown material type: {this.``type``}"
 
 type LightInfo =

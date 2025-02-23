@@ -223,7 +223,7 @@ type PSSMLTIntegrator
                                 L
                             )
 
-                    bsdfSample <- interaction.SampleBSDF(-ray.Direction, sampler.Next2D())
+                    bsdfSample <- interaction.SampleBSDF(-ray.Direction, sampler.Next1D(), sampler.Next2D())
 
                     if bsdfSample.eval.pdf = 0f then
                         depth <- this.MaxDepth
@@ -245,10 +245,9 @@ type PSSMLTIntegrator
 
         L
 
-    member this.BootstrapSingleChain
-        (bootstrapId: int, camera: CameraBase, film: Film, aggregate: PrimitiveAggregate, lightSampler: LightSamplerBase) =
+    member inline this.BootstrapSingleChain
+        (bootstrapId: int, xs: nativeptr<PrimarySample>, camera: CameraBase, film: Film, aggregate: PrimitiveAggregate, lightSampler: LightSamplerBase) =
         let struct (imageWidth, imageHeight) = film.Resolution
-        let xs = NativePtr.stackalloc<PrimarySample> (4 + 6 * this.MaxDepth)
 
         let mutable mltSampler =
             MLTSampler(Sampler(uint this.FrameId, uint bootstrapId), this.LargeStepProb, this.Strategy, xs)
@@ -274,17 +273,17 @@ type PSSMLTIntegrator
         let y = Vector3.Dot(L, Vector3(0.2126f, 0.7152f, 0.0722f))
         this.BootstrapWeights[bootstrapId] <- y
 
-    member this.RenderSingleChain
+    member inline this.RenderSingleChain
         (
             chainId: int,
             bootstrapSamplingTable: AliasTable,
+            xs: nativeptr<PrimarySample>,
             camera: CameraBase,
             film: Film,
             aggregate: PrimitiveAggregate,
             lightSampler: LightSamplerBase
         ) =
         let struct (imageWidth, imageHeight) = film.Resolution
-        let xs = Allocation.StackAlloc<PrimarySample>(4 + 6 * this.MaxDepth)
         let mutable sampler = Sampler(uint this.FrameId, uint chainId)
         let bootstrapId, _ = bootstrapSamplingTable.Sample(sampler.Next1D())
 
@@ -386,10 +385,10 @@ type PSSMLTIntegrator
         Parallel.ForEach(
             partitioner,
             (fun range _ ->
+                let xs = Allocation.StackAlloc<PrimarySample>(4 + 7 * this.MaxDepth)
                 let first, last = range
-
                 for bootstrapId = first to last - 1 do
-                    this.BootstrapSingleChain(bootstrapId, camera, film, aggregate, lightSampler))
+                    this.BootstrapSingleChain(bootstrapId, xs, camera, film, aggregate, lightSampler))
         )
         |> ignore
 
@@ -404,10 +403,10 @@ type PSSMLTIntegrator
             Parallel.ForEach(
                 partitioner,
                 (fun range _ ->
+                    let xs = Allocation.StackAlloc<PrimarySample>(4 + 7 * this.MaxDepth)
                     let first, last = range
-
                     for chainId = first to last - 1 do
-                        this.RenderSingleChain(chainId, bootstrapSamplingTable, camera, film, aggregate, lightSampler))
+                        this.RenderSingleChain(chainId, bootstrapSamplingTable, xs, camera, film, aggregate, lightSampler))
             )
             |> ignore
 

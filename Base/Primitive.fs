@@ -83,8 +83,8 @@ type Interaction =
     member inline this.EvalBSDF(wo: Vector3, wi: Vector3) =
         this.Material.Eval(this.geom.onb.WorldToLocal(wo), this.geom.onb.WorldToLocal(wi), this.geom.uv)
 
-    member inline this.SampleBSDF(wo: Vector3, uBSDF: Vector2) =
-        let mutable sample = this.Material.Sample(this.geom.onb.WorldToLocal(wo), this.UV, uBSDF)
+    member inline this.SampleBSDF(wo: Vector3, uLobe: float32, uBSDF: Vector2) =
+        let mutable sample = this.Material.Sample(this.geom.onb.WorldToLocal(wo), this.UV, uLobe, uBSDF)
         sample.wi <- this.geom.onb.LocalToWorld(sample.wi)
         sample
 

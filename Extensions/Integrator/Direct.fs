@@ -28,7 +28,7 @@ type DirectIntegrator(spp: int) =
                     let bsdfEval: BSDFEval = interaction.EvalBSDF(-ray.Direction, lightSample.wi)
                     L <- Vector3.FusedMultiplyAdd(bsdfEval.bsdf, lightSample.eval.L * (1f / lightSample.eval.pdf), L)
 
-                let bsdfSample = interaction.SampleBSDF(-ray.Direction, sampler.Next2D())
+                let bsdfSample = interaction.SampleBSDF(-ray.Direction, sampler.Next1D(), sampler.Next2D())
                 let ray = interaction.SpawnRay(bsdfSample.wi)
                 interaction <- Unchecked.defaultof<Interaction>
                 t <- infinityf

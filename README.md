@@ -12,7 +12,7 @@ Although this renderer is not designed for actual real-time rendering, we would 
 - [x] Support triangle mesh
 - [x] Use BVH for acceleration
 - [x] Support Lambertian, Mirror, Dielectric materials
-- [ ] Support Microfacet material
+- [x] Support Metallic-Roughness workflow materials (following [glTF specification](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#appendix-b-brdf-implementation))
 - [x] Path-traced DI & GI
 - [x] Primary Sample Space Metropolis Light Transport
 - [ ] ReSTIR DI

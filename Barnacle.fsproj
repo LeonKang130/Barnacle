@@ -36,6 +36,7 @@
     <Compile Include="Extensions\Material\Lambertian.fs" />
     <Compile Include="Extensions\Material\Dielectric.fs" />
     <Compile Include="Extensions\Material\Mirror.fs" />
+    <Compile Include="Extensions\Material\PBR.fs" />
     <Compile Include="Extensions\LightSampler\Uniform.fs" />
     <Compile Include="Extensions\Aggregate\BVH.fs" />
     <Compile Include="Extensions\Scene\Loader.fs" />
