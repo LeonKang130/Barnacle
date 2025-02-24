@@ -8,7 +8,6 @@ type PinholeCamera(fovY: float32, aspectRatio: float32, pushForward: float32) =
     inherit CameraBase(pushForward)
     member this.FovY = fovY
     member this.AspectRatio = aspectRatio
-    new(fovY: float32, aspectRatio: float32) = PinholeCamera(fovY, aspectRatio, 0f)
 
     override this.GenerateRay(resolution, pixelId, uPixel: Vector2, _) =
         let struct (imageWidth, imageHeight) = resolution

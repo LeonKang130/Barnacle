@@ -8,8 +8,6 @@ open System.Numerics
 [<Sealed>]
 type PathTracingIntegrator(spp: int, maxDepth: int, rrDepth: int) =
     inherit ProgressiveIntegrator(spp)
-    new(spp) = PathTracingIntegrator(spp, 8, 5)
-    new(spp, maxDepth) = PathTracingIntegrator(spp, maxDepth, 5)
     member this.MaxDepth = maxDepth
     member this.RRDepth = rrDepth
 

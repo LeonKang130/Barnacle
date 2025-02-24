@@ -8,7 +8,6 @@ open System.Numerics
 [<Sealed>]
 type SpherePrimitive(radius: float32) =
     inherit ElementalPrimitive()
-    new() = SpherePrimitive(1f)
     member this.Radius = radius
 
     override this.Intersect(ray, t) =
@@ -85,17 +84,6 @@ type SpherePrimitive(radius: float32) =
 [<Sealed>]
 type SphereInstance(sphere: SpherePrimitive, material: MaterialBase option, light: LightBase option) =
     inherit PrimitiveInstance(sphere, material, light)
-
-    new(radius: float32, material: MaterialBase, light: LightBase) =
-        SphereInstance(SpherePrimitive(radius), Some material, Some light)
-
-    new(radius: float32, material: MaterialBase) = SphereInstance(SpherePrimitive(radius), Some material, None)
-
-    new(radius: float32, light: LightBase) = SphereInstance(SpherePrimitive(radius), None, Some light)
-
-    new(material: MaterialBase, light: LightBase) = SphereInstance(SpherePrimitive.Unit, Some material, Some light)
-    new(material: MaterialBase) = SphereInstance(SpherePrimitive.Unit, Some material, None)
-    new(light: LightBase) = SphereInstance(SpherePrimitive.Unit, None, Some light)
 
     member this.Sphere = sphere
 

@@ -365,15 +365,15 @@
     ],
     "integrator": {
         "type": "pssmlt",
-        "spp": 4,
-        "max-depth": 12
+        "spp": 16,
+        "max-depth": 8
     },
     "camera": {
         "type": "thin-lens",
         "fov": 25.0,
         "aspect-ratio": 1.3333,
         "aperture": 4.0,
-        "focus-distance": 220.0,
+        "focus-distance": 210.0,
         "push-forward": 140.0
     },
     "film": {

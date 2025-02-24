@@ -9,8 +9,6 @@ type ThinLensCamera(aperture: float32, focusDistance: float32, fovY: float32, as
     inherit PinholeCamera(fovY, aspectRatio, pushForward)
     member this.Aperture = aperture
     member this.FocusDistance = focusDistance
-    new(aperture: float32, focusDistance: float32, fovY: float32, aspectRatio: float32) =
-        ThinLensCamera(aperture, focusDistance, fovY, aspectRatio, 0f)
     static member SampleDiskConcentric(uLens: Vector2) : Vector2 =
         let u = uLens * 2f - Vector2.One
         if u.X = 0f || u.Y = 0f then
