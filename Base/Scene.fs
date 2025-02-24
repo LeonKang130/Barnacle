@@ -35,20 +35,27 @@ type Transform(keyFrames: KeyFrame array) =
                 KeyFrame.Interpolate(&prevFrame, &nextFrame, t)
             | None -> this.KeyFrames[0].Matrix)
     
-type Node(transform: Transform, instances: PrimitiveInstance array) =
+type Node(transform: Transform, instances: PrimitiveInstance array, hasCamera: bool) =
     member this.Transform = transform
     member val Children = ResizeArray<Node>() with get
     member this.Instances = instances
-    member this.Traverse(t: float32, nodeToWorld: Matrix4x4) =
-        seq {
-            let objectToWorld = this.Transform.Eval(t) * nodeToWorld
-            for instance in this.Instances do
-                instance.UpdateTransform(objectToWorld)
-                yield instance
-            for child in this.Children do
-                yield! child.Traverse(t, objectToWorld)
-        }
+    member this.HasCamera = hasCamera
+    member this.Traverse(t: float32, camera: CameraBase, instances: ResizeArray<PrimitiveInstance>, nodeToWorld: Matrix4x4) =
+        let objectToWorld = this.Transform.Eval(t) * nodeToWorld
+        if this.HasCamera then
+            camera.UpdateTransform(objectToWorld)
+        for instance in this.Instances do
+            instance.UpdateTransform(objectToWorld)
+            instances.Add(instance)
+        for child in this.Children do
+            child.Traverse(t, camera, instances, objectToWorld)
 
-type Scene(root: Node) =
+type Scene(root: Node, integrator: IntegratorBase, camera: CameraBase, film: Film) =
     member this.Root = root
-    member this.Traverse(t: float32) = this.Root.Traverse(t, Matrix4x4.Identity) |> Seq.toArray
+    member this.Integrator = integrator
+    member this.Camera = camera
+    member this.Film = film
+    member this.Traverse(t: float32) =
+        let instances = ResizeArray<PrimitiveInstance>()
+        this.Root.Traverse(t, this.Camera, instances, Matrix4x4.Identity)
+        instances.ToArray()

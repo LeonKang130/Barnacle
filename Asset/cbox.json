@@ -13,7 +13,8 @@
             "children": [
                 1,
                 2,
-                3
+                3,
+                4
             ]
         },
         {
@@ -33,6 +34,10 @@
                 8
             ],
             "transform": 2
+        },
+        {
+            "transform": 3,
+            "has-camera": true
         }
     ],
     "instances": [
@@ -275,8 +280,8 @@
                 0.75,
                 0.75
             ],
-            "roughness": 0.6,
-            "metallic": 1.0
+            "roughness": 0.4,
+            "metallic": 0.9
         },
         {
             "type": "dielectric",
@@ -344,6 +349,36 @@
                     ]
                 }
             ]
+        },
+        {
+            "keyframes": [
+                {
+                    "time": 0.0,
+                    "translation": [
+                        50.0,
+                        40.8,
+                        295.6
+                    ]
+                }
+            ]
         }
-    ]
+    ],
+    "integrator": {
+        "type": "pssmlt",
+        "spp": 4,
+        "max-depth": 12
+    },
+    "camera": {
+        "type": "thin-lens",
+        "fov": 25.0,
+        "aspect-ratio": 1.3333,
+        "aperture": 4.0,
+        "focus-distance": 220.0,
+        "push-forward": 140.0
+    },
+    "film": {
+        "width": 1024,
+        "height": 768,
+        "tone-mapping": "aces"
+    }
 }

@@ -151,16 +151,11 @@ type MLTSampler =
 
 [<Sealed>]
 type PSSMLTIntegrator
-    (nBootstrap: int, nChains: int, mutationPerPixel: int, strategy: MutationStrategy, largeStepProb: float32) =
+    (maxDepth: int, rrDepth: int, nBootstrap: int, nChains: int, mutationPerPixel: int, strategy: MutationStrategy, largeStepProb: float32) =
     inherit ProgressiveIntegrator(mutationPerPixel)
 
-    new(mutationPerPixel: int) =
-        let defaultStrategy = MutationStrategy.Gaussian(1e-2f)
-        // let defaultStrategy = MutationStrategy.Kelemen(1f / 1024f, 1f / 16f)
-        PSSMLTIntegrator(1024 * 1024, 1024, mutationPerPixel, defaultStrategy, 0.3f)
-
-    member this.MaxDepth = 8
-    member this.RRDepth = 5
+    member this.MaxDepth = maxDepth
+    member this.RRDepth = rrDepth
     member this.NBootstrap = nBootstrap
     member this.NChains = nChains
     member this.Strategy = strategy

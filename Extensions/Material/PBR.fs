@@ -23,12 +23,12 @@ type PBRMaterial(baseColor: Vector3, metallic: float32, roughness: float32) =
         this.Alpha * this.Alpha / (MathF.PI * sqr(1f + MathF.FusedMultiplyAdd(this.Alpha, this.Alpha, -1f) * cosThetaH * cosThetaH))
     member inline private this.G(wo: Vector3, wi: Vector3) =
         1f / (1f + this.Lambda(wo) + this.Lambda(wi))
-    member private this.ConductorFresnel(wo: Vector3, wh: Vector3) =
+    member inline private this.ConductorFresnel(wo: Vector3, wh: Vector3) =
         let cosTheta = Vector3.Dot(wo, wh)
         let c = 1f - cosTheta
         let c2 = c * c
         this.BaseColor + (Vector3.One - this.BaseColor) * (c2 * c2 * c)
-    member private this.DielectricFresnel(wo: Vector3, wh: Vector3) =
+    member inline private this.DielectricFresnel(wo: Vector3, wh: Vector3) =
         let f0 = 0.04f
         let cosTheta = Vector3.Dot(wo, wh)
         let c = 1f - cosTheta
