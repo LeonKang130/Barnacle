@@ -198,9 +198,13 @@ type PSSMLTIntegrator
                             * MathF.ReciprocalEstimate(lightSample.eval.pdf + bsdfSample.eval.pdf)
 
                     L <- Vector3.FusedMultiplyAdd(beta, lightSample.eval.L * misWeight, L)
-
+                let uLight = sampler.Next1D()
+                let uEmit = sampler.Next2D()
+                let uLobe = sampler.Next1D()
+                let uBSDF = sampler.Next2D()
+                let uRussianRoulette = sampler.Next1D()
                 if interaction.HasMaterial then
-                    lightSample <- lightSampler.Sample(interaction.Position, sampler.Next1D(), sampler.Next2D())
+                    lightSample <- lightSampler.Sample(interaction.Position, uLight, uEmit)
                     let shadowRay = interaction.SpawnRay(lightSample.wi)
                     let lightDistance = (lightSample.eval.p - interaction.Position).Length()
 
@@ -218,7 +222,7 @@ type PSSMLTIntegrator
                                 L
                             )
 
-                    bsdfSample <- interaction.SampleBSDF(-ray.Direction, sampler.Next1D(), sampler.Next2D())
+                    bsdfSample <- interaction.SampleBSDF(-ray.Direction, uLobe, uBSDF)
 
                     if bsdfSample.eval.pdf = 0f then
                         depth <- this.MaxDepth
@@ -229,7 +233,7 @@ type PSSMLTIntegrator
                         if depth >= this.RRDepth then
                             let rrThreshold = MathF.Min(1f, MathF.Max(beta.X, MathF.Max(beta.Y, beta.Z)))
 
-                            if sampler.Next1D() < rrThreshold then
+                            if uRussianRoulette < rrThreshold then
                                 beta <- beta * MathF.ReciprocalEstimate(rrThreshold)
                             else
                                 depth <- this.MaxDepth
